@@ -13,147 +13,146 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface DSAQuestion {
-  id: number;
-  title: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  category: string;
-  description: string;
-  javaCode: string;
-  pythonCode: string;
+    id: number;
+    title: string;
+    difficulty: "Easy" | "Medium" | "Hard";
+    category: string;
+    description: string;
+    javaCode: string;
+    pythonCode: string;
 }
 
 const questionsPerPage = 10;
 
 const DSAQuestions = () => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
-  const [solvedQuestions, setSolvedQuestions] = useState<number[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
-  const { user, profile, updateProfile } = useAuth();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
+    const [solvedQuestions, setSolvedQuestions] = useState<number[]>([]);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
+    const { user, profile, updateProfile } = useAuth();
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchSolvedQuestions = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
+    useEffect(() => {
+        const fetchSolvedQuestions = async () => {
+            if (!user) {
+                setIsLoading(false);
+                return;
+            }
 
-      try {
-        const { data, error } = await supabase
-          .from('solved_questions')
-          .select('question_id')
-          .eq('user_id', user.id);
+            try {
+                const { data, error } = await supabase
+                    .from('solved_questions')
+                    .select('question_id')
+                    .eq('user_id', user.id);
 
-        if (error) {
-          console.error('Error fetching solved questions:', error);
-          toast({
-            title: "Error",
-            description: "Failed to fetch your solved questions.",
-            variant: "destructive",
-          });
-        } else if (data) {
-          const questionIds = data.map(item => item.question_id);
-          setSolvedQuestions(questionIds);
+                if (error) {
+                    console.error('Error fetching solved questions:', error);
+                    toast({
+                        title: "Error",
+                        description: "Failed to fetch your solved questions.",
+                        variant: "destructive",
+                    });
+                } else if (data) {
+                    const questionIds = data.map(item => item.question_id);
+                    setSolvedQuestions(questionIds);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchSolvedQuestions();
+    }, [user, toast]);
+
+    const handleCheckboxClick = (questionId: number) => {
+        if (!user) {
+            toast({
+                title: "Authentication Required",
+                description: "Please log in to track your solved questions.",
+                variant: "destructive",
+            });
+            return;
         }
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setIsLoading(false);
-      }
+
+        setCurrentQuestionId(questionId);
+        setIsDialogOpen(true);
     };
 
-    fetchSolvedQuestions();
-  }, [user, toast]);
+    const handleConfirmSolved = async () => {
+        if (!user || currentQuestionId === null) return;
 
-  const handleCheckboxClick = (questionId: number) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to track your solved questions.",
-        variant: "destructive",
-      });
-      return;
-    }
+        try {
+            setIsLoading(true);
 
-    setCurrentQuestionId(questionId);
-    setIsDialogOpen(true);
-  };
+            if (!solvedQuestions.includes(currentQuestionId)) {
+                const { error } = await supabase
+                    .from('solved_questions')
+                    .insert({
+                        user_id: user.id,
+                        question_id: currentQuestionId,
+                        solved_at: new Date().toISOString()
+                    });
 
-PR!nce, [24-04-2025 22:39]
-const handleConfirmSolved = async () => {
-    if (!user  currentQuestionId === null) return;
+                if (error) {
+                    console.error('Error marking question as solved:', error);
+                    toast({
+                        title: "Error",
+                        description: "Failed to mark question as solved.",
+                        variant: "destructive",
+                    });
+                } else {
+                    setSolvedQuestions(prev => [...prev, currentQuestionId]);
 
-    try {
-      setIsLoading(true);
-      
-      if (!solvedQuestions.includes(currentQuestionId)) {
-        const { error } = await supabase
-          .from('solved_questions')
-          .insert({ 
-            user_id: user.id, 
-            question_id: currentQuestionId,
-            solved_at: new Date().toISOString()
-          });
+                    const newCount = solvedQuestions.length + 1;
+                    const newBadge = getBadgeForQuestionCount(newCount);
 
-        if (error) {
-          console.error('Error marking question as solved:', error);
-          toast({
-            title: "Error",
-            description: "Failed to mark question as solved.",
-            variant: "destructive",
-          });
-        } else {
-          setSolvedQuestions(prev => [...prev, currentQuestionId]);
-          
-          const newCount = solvedQuestions.length + 1;
-          const newBadge = getBadgeForQuestionCount(newCount);
-          
-          if (profile && (newBadge !== profile.badge  profile.questions_solved !== newCount)) {
-            await updateProfile({
-              questions_solved: newCount,
-              badge: newBadge
-            });
-          }
-          
-          toast({
-            title: "Success!",
-            description: Question marked as solved. ${newBadge !== profile?.badge ? `You've earned the ${newBadge} badge! : ''}`,
-          });
+                    if (profile && (newBadge !== profile.badge || profile.questions_solved !== newCount)) {
+                        await updateProfile({
+                            questions_solved: newCount,
+                            badge: newBadge
+                        });
+
+                        toast({
+                            title: "Success!",
+                            description: `Question marked as solved.${newBadge !== profile?.badge ? ` You've earned the ${newBadge} badge!` : ''}`,
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        } finally {
+            setIsDialogOpen(false);
+            setCurrentQuestionId(null);
+            setIsLoading(false);
         }
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
-      setIsDialogOpen(false);
-      setCurrentQuestionId(null);
-      setIsLoading(false);
-    }
-  };
+    };
 
-  const handleCancelSolved = () => {
-    setIsDialogOpen(false);
-    setCurrentQuestionId(null);
-  };
+    const handleCancelSolved = () => {
+        setIsDialogOpen(false);
+        setCurrentQuestionId(null);
+    };
 
-  const getBadgeForQuestionCount = (count: number): string => {
-    if (count >= 100) return "Diamond";
-    if (count >= 75) return "Gold";
-    if (count >= 50) return "Silver";
-    if (count >= 25) return "Bronze";
-    return "Beginner";
-  };
+    const getBadgeForQuestionCount = (count: number): string => {
+        if (count >= 100) return "Diamond";
+        if (count >= 75) return "Gold";
+        if (count >= 50) return "Silver";
+        if (count >= 25) return "Bronze";
+        return "Beginner";
+    };
 
-  const dsaQuestions: DSAQuestion[] = [
-    {
-      id: 1,
-      title: "Two Sum",
-      difficulty: "Easy",
-      category: "Arrays",
-      description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-      javaCode: `
+    const dsaQuestions: DSAQuestion[] = [
+        {
+            id: 1,
+            title: "Two Sum",
+            difficulty: "Easy",
+            category: "Arrays",
+            description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+            javaCode: `
 // Time Complexity: O(n)
 // Space Complexity: O(n)
 public int[] twoSum(int[] nums, int target) {
@@ -173,7 +172,7 @@ public int[] twoSum(int[] nums, int target) {
     }
     return new int[] {};
 }`,
-      pythonCode: `
+            pythonCode: `
 # Time Complexity: O(n)
 # Space Complexity: O(n)
 def two_sum(nums: List[int], target: int) -> List[int]:
@@ -191,14 +190,14 @@ def two_sum(nums: List[int], target: int) -> List[int]:
         num_map[num] = i
     
     return []`
-    },
-    {
-      id: 2,
-      title: "Valid Parentheses",
-      difficulty: "Easy",
-      category: "Stack",
-      description: "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
-      javaCode: `
+        },
+        {
+            id: 2,
+            title: "Valid Parentheses",
+            difficulty: "Easy",
+            category: "Stack",
+            description: "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
+            javaCode: `
 // Time Complexity: O(n)
 // Space Complexity: O(n)
 public boolean isValid(String s) {
@@ -216,9 +215,7 @@ public boolean isValid(String s) {
         // If it's a closing bracket
         if (brackets.containsKey(c)) {
             // Get matching opening bracket from top of stack
-
-PR!nce, [24-04-2025 22:39]
-char topElement = stack.empty() ? '#' : stack.pop();
+            char topElement = stack.empty() ? '#' : stack.pop();
             
             // Check if brackets match
             if (topElement != brackets.get(c)) {
@@ -233,7 +230,7 @@ char topElement = stack.empty() ? '#' : stack.pop();
     // String is valid if stack is empty
     return stack.isEmpty();
 }`,
-      pythonCode: `
+            pythonCode: `
 # Time Complexity: O(n)
 # Space Complexity: O(n)
 def is_valid(s: str) -> bool:
@@ -259,14 +256,14 @@ def is_valid(s: str) -> bool:
     
     # String is valid if stack is empty
     return len(stack) == 0`
-    },
-    {
-      id: 3,
-      title: "Maximum Subarray",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Given an integer array nums, find the contiguous subarray with the largest sum and return its sum.",
-      javaCode: `
+        },
+        {
+            id: 3,
+            title: "Maximum Subarray",
+            difficulty: "Medium",
+            category: "Dynamic Programming",
+            description: "Given an integer array nums, find the contiguous subarray with the largest sum and return its sum.",
+            javaCode: `
 // Time Complexity: O(n)
 // Space Complexity: O(1)
 public int maxSubArray(int[] nums) {
@@ -284,7 +281,7 @@ public int maxSubArray(int[] nums) {
     
     return maxSum;
 }`,
-      pythonCode: `
+            pythonCode: `
 # Time Complexity: O(n)
 # Space Complexity: O(1)
 def max_subarray(nums: List[int]) -> int:
@@ -299,14 +296,14 @@ def max_subarray(nums: List[int]) -> int:
         max_sum = max(max_sum, current_sum)
     
     return max_sum`
-    },
-    {
-      id: 4,
-      title: "Merge Two Sorted Lists",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Merge two sorted linked lists and return it as a sorted list.",
-      javaCode: `
+        },
+        {
+            id: 4,
+            title: "Merge Two Sorted Lists",
+            difficulty: "Easy",
+            category: "Linked List",
+            description: "Merge two sorted linked lists and return it as a sorted list.",
+            javaCode: `
 // Time Complexity: O(n + m)
 // Space Complexity: O(1)
 public ListNode mergeTwoLists(ListNode l1, ListNode l2) {
@@ -331,7 +328,7 @@ public ListNode mergeTwoLists(ListNode l1, ListNode l2) {
     
     return dummy.next;
 }`,
-      pythonCode: `
+            pythonCode: `
 # Time Complexity: O(n + m)
 # Space Complexity: O(1)
 def merge_two_lists(l1: ListNode, l2: ListNode) -> ListNode:
@@ -353,16 +350,14 @@ def merge_two_lists(l1: ListNode, l2: ListNode) -> ListNode:
     current.next = l1 if l1 else l2
     
     return dummy.next`
-    },
-    {
-      id: 5,
-      title: "Reverse Linked List",
-      difficulty: "Easy",
-      category: "Linked List",
-
-PR!nce, [24-04-2025 22:39]
-description: "Given the head of a singly linked list, reverse the list, and return the reversed list.",
-      javaCode: `
+        },
+        {
+            id: 5,
+            title: "Reverse Linked List",
+            difficulty: "Easy",
+            category: "Linked List",
+            description: "Given the head of a singly linked list, reverse the list, and return the reversed list.",
+            javaCode: `
 // Time Complexity: O(n)
 // Space Complexity: O(1)
 public ListNode reverseList(ListNode head) {
@@ -382,7 +377,7 @@ public ListNode reverseList(ListNode head) {
     
     return prev;
 }`,
-      pythonCode: `
+            pythonCode: `
 # Time Complexity: O(n)
 // Space Complexity: O(1)
 def reverse_list(head: ListNode) -> ListNode:
@@ -400,14 +395,14 @@ def reverse_list(head: ListNode) -> ListNode:
         current = next_node
     
     return prev`
-    },
+        },
     {
-      id: 6,
-      title: "Climbing Stairs",
-      difficulty: "Easy",
-      category: "Dynamic Programming",
-      description: "You are climbing a staircase. It takes n steps to reach the top. Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?",
-      javaCode: `
+        id: 6,
+        title: "Climbing Stairs",
+        difficulty: "Easy",
+        category: "Dynamic Programming",
+        description: "You are climbing a staircase. It takes n steps to reach the top. Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?",
+        javaCode: `
 public int climbStairs(int n) {
     if (n <= 2) return n;
     
@@ -421,7 +416,7 @@ public int climbStairs(int n) {
     
     return dp[n];
 }`,
-      pythonCode: `
+        pythonCode: `
 def climb_stairs(n: int) -> int:
     if n <= 2:
         return n
@@ -436,12 +431,12 @@ def climb_stairs(n: int) -> int:
     return dp[n]`
     },
     {
-      id: 7,
-      title: "Best Time to Buy and Sell Stock",
-      difficulty: "Easy",
-      category: "Arrays",
-      description: "Given an array prices where prices[i] is the price of a given stock on the ith day, find the maximum profit you can achieve.",
-      javaCode: `
+        id: 7,
+        title: "Best Time to Buy and Sell Stock",
+        difficulty: "Easy",
+        category: "Arrays",
+        description: "Given an array prices where prices[i] is the price of a given stock on the ith day, find the maximum profit you can achieve.",
+        javaCode: `
 public int maxProfit(int[] prices) {
     int minPrice = Integer.MAX_VALUE;
     int maxProfit = 0;
@@ -453,7 +448,7 @@ public int maxProfit(int[] prices) {
     
     return maxProfit;
 }`,
-      pythonCode: `
+        pythonCode: `
 def max_profit(prices: List[int]) -> int:
     min_price = float('inf')
     max_profit = 0
@@ -465,18 +460,17 @@ def max_profit(prices: List[int]) -> int:
     return max_profit`
     },
     {
-      id: 8,
-      title: "Symmetric Tree",
-      difficulty: "Easy",
-      category: "Binary Trees",
-      description: "Given the root of a binary tree, check whether it is a mirror of itself (i.e., symmetric around its center).",
-      javaCode: `
+        id: 8,
+        title: "Symmetric Tree",
+        difficulty: "Easy",
+        category: "Binary Trees",
+        description: "Given the root of a binary tree, check whether it is a mirror of itself (i.e., symmetric around its center).",
+        javaCode: `
 public boolean isSymmetric(TreeNode root) {
     if (root == null) return true;
     return isMirror(root.left, root.right);
 }
 
-PR!nce, [24-04-2025 22:39]
 private boolean isMirror(TreeNode left, TreeNode right) {
     if (left == null && right == null) return true;
     if (left == null  right == null) return false;
@@ -485,7 +479,7 @@ private boolean isMirror(TreeNode left, TreeNode right) {
         && isMirror(left.left, right.right)
         && isMirror(left.right, right.left);
 }`,
-      pythonCode: `
+        pythonCode: `
 def is_symmetric(root: TreeNode) -> bool:
     def is_mirror(left: TreeNode, right: TreeNode) -> bool:
         if not left and not right:
@@ -502,12 +496,12 @@ def is_symmetric(root: TreeNode) -> bool:
     return is_mirror(root.left, root.right)`
     },
     {
-      id: 9,
-      title: "Binary Tree Level Order Traversal",
-      difficulty: "Medium",
-      category: "Binary Trees",
-      description: "Given the root of a binary tree, return the level order traversal of its nodes' values (i.e., from left to right, level by level).",
-      javaCode: `
+        id: 9,
+        title: "Binary Tree Level Order Traversal",
+        difficulty: "Medium",
+        category: "Binary Trees",
+        description: "Given the root of a binary tree, return the level order traversal of its nodes' values (i.e., from left to right, level by level).",
+        javaCode: `
 public List<List<Integer>> levelOrder(TreeNode root) {
     List<List<Integer>> result = new ArrayList<>();
     if (root == null) return result;
@@ -532,7 +526,7 @@ public List<List<Integer>> levelOrder(TreeNode root) {
     
     return result;
 }`,
-      pythonCode: `
+        pythonCode: `
 def level_order(root: TreeNode) -> List[List[int]]:
     if not root:
         return []
@@ -558,12 +552,12 @@ def level_order(root: TreeNode) -> List[List[int]]:
     return result`
     },
     {
-      id: 10,
-      title: "Merge k Sorted Lists",
-      difficulty: "Hard",
-      category: "Linked Lists",
-      description: "Given an array of k linked-lists lists, each linked-list is sorted in ascending order. Merge all the linked-lists into one sorted linked-list and return it.",
-      javaCode: `
+        id: 10,
+        title: "Merge k Sorted Lists",
+        difficulty: "Hard",
+        category: "Linked Lists",
+        description: "Given an array of k linked-lists lists, each linked-list is sorted in ascending order. Merge all the linked-lists into one sorted linked-list and return it.",
+        javaCode: `
 public ListNode mergeKLists(ListNode[] lists) {
     if (lists == null  lists.length == 0) return null;
     
@@ -590,7 +584,7 @@ public ListNode mergeKLists(ListNode[] lists) {
     
     return dummy.next;
 }`,
-      pythonCode: `
+        pythonCode: `
 def merge_k_lists(lists: List[ListNode]) -> ListNode:
     if not lists:
         return None
@@ -617,14 +611,12 @@ def merge_k_lists(lists: List[ListNode]) -> ListNode:
     return dummy.next`
     },
     {
-      id: 11,
-      title: "LRU Cache",
-      difficulty: "Medium",
-      category: "Design",
-
-PR!nce, [24-04-2025 22:39]
-description: "Design a data structure that follows the constraints of a Least Recently Used (LRU) cache.",
-      javaCode: `
+        id: 11,
+        title: "LRU Cache",
+        difficulty: "Medium",
+        category: "Design",
+        description: "Design a data structure that follows the constraints of a Least Recently Used (LRU) cache.",
+        javaCode: `
 class LRUCache {
     class Node {
         int key, value;
@@ -701,7 +693,7 @@ class LRUCache {
         return res;
     }
 }`,
-      pythonCode: `
+        pythonCode: `
 class LRUCache:
     def init(self, capacity: int):
         self.cache = {}
@@ -753,17 +745,16 @@ class LRUCache:
         self._remove_node(res)
         return res`
     },
-    {
-      id: 12,
-      title: "Number of Islands",
-      difficulty: "Medium",
-      category: "Graphs",
-      description: "Given an m x n 2D binary grid which represents a map of '1's (land) and '0's (water), return the number of islands.",
-      javaCode: `
-public int numIslands(char[][] grid) {
 
-PR!nce, [24-04-2025 22:39]
-if (grid == null  grid.length == 0) return 0;
+    {
+        id: 12,
+        title: "Number of Islands",
+        difficulty: "Medium",
+        category: "Graphs",
+        description: "Given an m x n 2D binary grid which represents a map of '1's (land) and '0's (water), return the number of islands.",
+        javaCode: `
+public int numIslands(char[][] grid) {
+    if (grid == null  grid.length == 0) return 0;
     
     int count = 0;
     for (int i = 0; i < grid.length; i++) {
@@ -786,7 +777,7 @@ private void dfs(char[][] grid, int i, int j) {
     dfs(grid, i, j + 1);
     dfs(grid, i, j - 1);
 }`,
-      pythonCode: `
+        pythonCode: `
 def numIslands(self, grid: List[List[str]]) -> int:
     if not grid:
         return 0
@@ -810,12 +801,12 @@ def dfs(self, grid, i, j):
     self.dfs(grid, i, j-1)`
     },
     {
-      id: 13,
-      title: "Rotate Image",
-      difficulty: "Medium",
-      category: "Arrays",
-      description: "You are given an n x n 2D matrix representing an image. Rotate the image by 90 degrees (clockwise).",
-      javaCode: `
+        id: 13,
+        title: "Rotate Image",
+        difficulty: "Medium",
+        category: "Arrays",
+        description: "You are given an n x n 2D matrix representing an image. Rotate the image by 90 degrees (clockwise).",
+        javaCode: `
 public void rotate(int[][] matrix) {
     int n = matrix.length;
     
@@ -837,7 +828,7 @@ public void rotate(int[][] matrix) {
         }
     }
 }`,
-      pythonCode: `
+        pythonCode: `
 def rotate(self, matrix: List[List[int]]) -> None:
     n = len(matrix)
     
@@ -851,12 +842,12 @@ def rotate(self, matrix: List[List[int]]) -> None:
         matrix[i].reverse()`
     },
     {
-      id: 14,
-      title: "Course Schedule",
-      difficulty: "Medium",
-      category: "Graphs",
-      description: "There are a total of numCourses courses you have to take. Some courses may have prerequisites. Return true if you can finish all courses.",
-      javaCode: `
+        id: 14,
+        title: "Course Schedule",
+        difficulty: "Medium",
+        category: "Graphs",
+        description: "There are a total of numCourses courses you have to take. Some courses may have prerequisites. Return true if you can finish all courses.",
+        javaCode: `
 public boolean canFinish(int numCourses, int[][] prerequisites) {
     List<List<Integer>> adj = new ArrayList<>();
     for (int i = 0; i < numCourses; i++) {
@@ -890,7 +881,7 @@ private boolean dfs(List<List<Integer>> adj, int[] visited, int v) {
     visited[v] = 2;
     return true;
 }`,
-      pythonCode: `
+        pythonCode: `
 def canFinish(self, numCourses: int, prerequisites: List[List[int]]) -> bool:
     adj = [[] for _ in range(numCourses)]
     for course, pre in prerequisites:
@@ -915,14 +906,12 @@ def canFinish(self, numCourses: int, prerequisites: List[List[int]]) -> bool:
     return True`
     },
     {
-      id: 15,
-      title: "Word Break",
-      difficulty: "Medium",
-
-PR!nce, [24-04-2025 22:39]
-category: "Dynamic Programming",
-      description: "Given a string s and a dictionary of strings wordDict, return true if s can be segmented into a space-separated sequence of one or more dictionary words.",
-      javaCode: `
+        id: 15,
+        title: "Word Break",
+        difficulty: "Medium",
+        category: "Dynamic Programming",
+        description: "Given a string s and a dictionary of strings wordDict, return true if s can be segmented into a space-separated sequence of one or more dictionary words.",
+        javaCode: `
 public boolean wordBreak(String s, List<String> wordDict) {
     Set<String> dict = new HashSet<>(wordDict);
     boolean[] dp = new boolean[s.length() + 1];
@@ -938,7 +927,7 @@ public boolean wordBreak(String s, List<String> wordDict) {
     }
     return dp[s.length()];
 }`,
-      pythonCode: `
+        pythonCode: `
 def wordBreak(self, s: str, wordDict: List[str]) -> bool:
     word_set = set(wordDict)
     dp = [False] * (len(s) + 1)
@@ -954,12 +943,12 @@ def wordBreak(self, s: str, wordDict: List[str]) -> bool:
     },
 
     {
-      id: 16,
-      title: "Minimum Window Substring",
-      difficulty: "Hard",
-      category: "Strings",
-      description: "Given two strings s and t of lengths m and n respectively, return the minimum window substring of s such that every character in t (including duplicates) is included in the window.",
-      javaCode: `
+        id: 16,
+        title: "Minimum Window Substring",
+        difficulty: "Hard",
+        category: "Strings",
+        description: "Given two strings s and t of lengths m and n respectively, return the minimum window substring of s such that every character in t (including duplicates) is included in the window.",
+        javaCode: `
 public String minWindow(String s, String t) {
     if (s.length() == 0  t.length() == 0) return "";
     
@@ -1005,7 +994,7 @@ public String minWindow(String s, String t) {
     
     return ans[0] == -1 ? "" : s.substring(ans[1], ans[2] + 1);
 }`,
-      pythonCode: `
+        pythonCode: `
 def minWindow(self, s: str, t: str) -> str:
     if not t or not s:
         return ""
@@ -1047,14 +1036,13 @@ def minWindow(self, s: str, t: str) -> str:
     return "" if ans[0] == float("inf") else s[ans[1]: ans[2] + 1]`
     },
 
-PR!nce, [24-04-2025 22:39]
-{
-      id: 17,
-      title: "Longest Palindromic Substring",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Given a string s, return the longest palindromic substring in s.",
-      javaCode: `
+    {
+        id: 17,
+        title: "Longest Palindromic Substring",
+        difficulty: "Medium",
+        category: "Dynamic Programming",
+        description: "Given a string s, return the longest palindromic substring in s.",
+        javaCode: `
     public String longestPalindrome(String s) {
         int n = s.length();
         boolean[][] dp = new boolean[n][n];
@@ -1073,7 +1061,7 @@ PR!nce, [24-04-2025 22:39]
         return res;
     }
     `,
-      pythonCode: `
+        pythonCode: `
     def longestPalindrome(s: str) -> str:
         n = len(s)
         dp = [[False]*n for _ in range(n)]
@@ -1088,14 +1076,14 @@ PR!nce, [24-04-2025 22:39]
         return res
     `
     },
-    
+
     {
-      id: 18,
-      title: "Valid Parentheses",
-      difficulty: "Easy",
-      category: "Stack",
-      description: "Given a string containing only brackets, determine if the input string is valid.",
-      javaCode: `
+        id: 18,
+        title: "Valid Parentheses",
+        difficulty: "Easy",
+        category: "Stack",
+        description: "Given a string containing only brackets, determine if the input string is valid.",
+        javaCode: `
     public boolean isValid(String s) {
         Stack<Character> stack = new Stack<>();
         for (char c : s.toCharArray()) {
@@ -1106,7 +1094,7 @@ PR!nce, [24-04-2025 22:39]
         }
         return stack.isEmpty();
     }`,
-      pythonCode: `
+        pythonCode: `
     def isValid(s: str) -> bool:
         stack = []
         mapping = {')': '(', '}': '{', ']': '['}
@@ -1119,16 +1107,14 @@ PR!nce, [24-04-2025 22:39]
                 stack.append(char)
         return not stack`
     },
-    
-    {
-      id: 19,
-      title: "Merge Intervals",
-      difficulty: "Medium",
-      category: "Sorting",
 
-PR!nce, [24-04-2025 22:39]
-description: "Given an array of intervals, merge all overlapping intervals.",
-      javaCode: `
+    {
+        id: 19,
+        title: "Merge Intervals",
+        difficulty: "Medium",
+        category: "Sorting",
+        description: "Given an array of intervals, merge all overlapping intervals.",
+        javaCode: `
     public int[][] merge(int[][] intervals) {
         if (intervals.length <= 1) return intervals;
         Arrays.sort(intervals, (a, b) -> Integer.compare(a[0], b[0]));
@@ -1145,7 +1131,7 @@ description: "Given an array of intervals, merge all overlapping intervals.",
         result.add(current);
         return result.toArray(new int[result.size()][]);
     }`,
-      pythonCode: `
+        pythonCode: `
     def merge(intervals):
         intervals.sort(key=lambda x: x[0])
         merged = []
@@ -1156,14 +1142,14 @@ description: "Given an array of intervals, merge all overlapping intervals.",
                 merged[-1][1] = max(merged[-1][1], interval[1])
         return merged`
     },
-    
+
     {
-      id: 20,
-      title: "Two Sum",
-      difficulty: "Easy",
-      category: "Hashing",
-      description: "Given an array and a target, return indices of two numbers such that they add up to the target.",
-      javaCode: `
+        id: 20,
+        title: "Two Sum",
+        difficulty: "Easy",
+        category: "Hashing",
+        description: "Given an array and a target, return indices of two numbers such that they add up to the target.",
+        javaCode: `
     public int[] twoSum(int[] nums, int target) {
         Map<Integer, Integer> map = new HashMap<>();
         for (int i = 0; i < nums.length; i++) {
@@ -1175,7 +1161,7 @@ description: "Given an array of intervals, merge all overlapping intervals.",
         }
         return new int[0];
     }`,
-      pythonCode: `
+        pythonCode: `
     def twoSum(nums, target):
         hashmap = {}
         for i, num in enumerate(nums):
@@ -1184,14 +1170,14 @@ description: "Given an array of intervals, merge all overlapping intervals.",
                 return [hashmap[diff], i]
             hashmap[num] = i`
     },
-    
+
     {
-      id: 21,
-      title: "Best Time to Buy and Sell Stock",
-      difficulty: "Easy",
-      category: "Greedy",
-      description: "Find the maximum profit by choosing a single day to buy one stock and choosing a different day to sell.",
-      javaCode: `
+        id: 21,
+        title: "Best Time to Buy and Sell Stock",
+        difficulty: "Easy",
+        category: "Greedy",
+        description: "Find the maximum profit by choosing a single day to buy one stock and choosing a different day to sell.",
+        javaCode: `
     public int maxProfit(int[] prices) {
         int minPrice = Integer.MAX_VALUE, maxProfit = 0;
         for (int price : prices) {
@@ -1200,7 +1186,7 @@ description: "Given an array of intervals, merge all overlapping intervals.",
         }
         return maxProfit;
     }`,
-      pythonCode: `
+        pythonCode: `
     def maxProfit(prices):
         min_price = float('inf')
         max_profit = 0
@@ -1209,14 +1195,14 @@ description: "Given an array of intervals, merge all overlapping intervals.",
             max_profit = max(max_profit, price - min_price)
         return max_profit`
     },
-    
+
     {
-      id: 22,
-      title: "Climbing Stairs",
-      difficulty: "Easy",
-      category: "Dynamic Programming",
-      description: "You are climbing stairs. Each time you can either take 1 or 2 steps. In how many distinct ways can you climb to the top?",
-      javaCode: `
+        id: 22,
+        title: "Climbing Stairs",
+        difficulty: "Easy",
+        category: "Dynamic Programming",
+        description: "You are climbing stairs. Each time you can either take 1 or 2 steps. In how many distinct ways can you climb to the top?",
+        javaCode: `
     public int climbStairs(int n) {
         if (n <= 2) return n;
         int a = 1, b = 2;
@@ -1227,7 +1213,7 @@ description: "Given an array of intervals, merge all overlapping intervals.",
         }
         return b;
     }`,
-      pythonCode: `
+        pythonCode: `
     def climbStairs(n):
         if n <= 2:
             return n
@@ -1237,14 +1223,13 @@ description: "Given an array of intervals, merge all overlapping intervals.",
         return b`
     },
 
-PR!nce, [24-04-2025 22:39]
-{
-      id: 23,
-      title: "Set Matrix Zeroes",
-      difficulty: "Medium",
-      category: "Matrix",
-      description: "Given an m x n matrix, if an element is 0, set its entire row and column to 0.",
-      javaCode: `
+    {
+        id: 23,
+        title: "Set Matrix Zeroes",
+        difficulty: "Medium",
+        category: "Matrix",
+        description: "Given an m x n matrix, if an element is 0, set its entire row and column to 0.",
+        javaCode: `
     public void setZeroes(int[][] matrix) {
         boolean[] row = new boolean[matrix.length];
         boolean[] col = new boolean[matrix[0].length];
@@ -1266,7 +1251,7 @@ PR!nce, [24-04-2025 22:39]
             }
         }
     }`,
-      pythonCode: `
+        pythonCode: `
     def setZeroes(matrix):
         rows, cols = len(matrix), len(matrix[0])
         row_zero = set()
@@ -1283,14 +1268,14 @@ PR!nce, [24-04-2025 22:39]
                 if i in row_zero or j in col_zero:
                     matrix[i][j] = 0`
     },
-    
+
     {
-      id: 24,
-      title: "Group Anagrams",
-      difficulty: "Medium",
-      category: "Hashing",
-      description: "Given an array of strings, group the anagrams together.",
-      javaCode: `
+        id: 24,
+        title: "Group Anagrams",
+        difficulty: "Medium",
+        category: "Hashing",
+        description: "Given an array of strings, group the anagrams together.",
+        javaCode: `
     public List<List<String>> groupAnagrams(String[] strs) {
         Map<String, List<String>> map = new HashMap<>();
         for (String str : strs) {
@@ -1301,7 +1286,7 @@ PR!nce, [24-04-2025 22:39]
         }
         return new ArrayList<>(map.values());
     }`,
-      pythonCode: `
+        pythonCode: `
     def groupAnagrams(strs):
         hashmap = {}
         for s in strs:
@@ -1311,14 +1296,14 @@ PR!nce, [24-04-2025 22:39]
             hashmap[key].append(s)
         return list(hashmap.values())`
     },
-    
+
     {
-      id: 25,
-      title: "Missing Number",
-      difficulty: "Easy",
-      category: "Math",
-      description: "Given an array containing n distinct numbers from 0 to n, find the one that is missing.",
-      javaCode: `
+        id: 25,
+        title: "Missing Number",
+        difficulty: "Easy",
+        category: "Math",
+        description: "Given an array containing n distinct numbers from 0 to n, find the one that is missing.",
+        javaCode: `
     public int missingNumber(int[] nums) {
         int n = nums.length;
         int total = n * (n + 1) / 2;
@@ -1326,19 +1311,19 @@ PR!nce, [24-04-2025 22:39]
         for (int num : nums) sum += num;
         return total - sum;
     }`,
-      pythonCode: `
+        pythonCode: `
     def missingNumber(nums):
         n = len(nums)
         return n * (n + 1) // 2 - sum(nums)`
     },
-    
+
     {
-      id: 26,
-      title: "Majority Element",
-      difficulty: "Easy",
-      category: "Array",
-      description: "Given an array of size n, find the majority element that appears more than n/2 times.",
-      javaCode: `
+        id: 26,
+        title: "Majority Element",
+        difficulty: "Easy",
+        category: "Array",
+        description: "Given an array of size n, find the majority element that appears more than n/2 times.",
+        javaCode: `
     public int majorityElement(int[] nums) {
         int count = 0, candidate = 0;
         for (int num : nums) {
@@ -1347,7 +1332,7 @@ PR!nce, [24-04-2025 22:39]
         }
         return candidate;
     }`,
-      pythonCode: `
+        pythonCode: `
     def majorityElement(nums):
         count = 0
         candidate = None
@@ -1359,22 +1344,19 @@ PR!nce, [24-04-2025 22:39]
     },
 
     {
-      id: 27,
-      title: "Search in Rotated Sorted Array",
-      difficulty: "Medium",
-      category: "Binary Search",
-      description: "Search a given target in a rotated sorted array.",
-      javaCode: `
+        id: 27,
+        title: "Search in Rotated Sorted Array",
+        difficulty: "Medium",
+        category: "Binary Search",
+        description: "Search a given target in a rotated sorted array.",
+        javaCode: `
     public int search(int[] nums, int target) {
         int left = 0, right = nums.length - 1;
         while (left <= right) {
             int mid = left + (right - left) / 2;
             if (nums[mid] == target) return mid;
             if (nums[left] <= nums[mid]) {
-                i
-
-PR!nce, [24-04-2025 22:39]
-f (nums[left] <= target && target < nums[mid])
+                if (nums[left] <= target && target < nums[mid])
                     right = mid - 1;
                 else
                     left = mid + 1;
@@ -1387,7 +1369,7 @@ f (nums[left] <= target && target < nums[mid])
         }
         return -1;
     }`,
-      pythonCode: `
+        pythonCode: `
     def search(nums, target):
         left, right = 0, len(nums) - 1
         while left <= right:
@@ -1406,14 +1388,14 @@ f (nums[left] <= target && target < nums[mid])
                     right = mid - 1
         return -1`
     },
-    
+
     {
-      id: 28,
-      title: "Sort Colors",
-      difficulty: "Medium",
-      category: "Two Pointers",
-      description: "Sort an array with values 0, 1, 2 representing colors using constant space.",
-      javaCode: `
+        id: 28,
+        title: "Sort Colors",
+        difficulty: "Medium",
+        category: "Two Pointers",
+        description: "Sort an array with values 0, 1, 2 representing colors using constant space.",
+        javaCode: `
     public void sortColors(int[] nums) {
         int low = 0, mid = 0, high = nums.length - 1;
         while (mid <= high) {
@@ -1434,7 +1416,7 @@ f (nums[left] <= target && target < nums[mid])
             }
         }
     }`,
-      pythonCode: `
+        pythonCode: `
     def sortColors(nums):
         low, mid, high = 0, 0, len(nums) - 1
         while mid <= high:
@@ -1448,14 +1430,14 @@ f (nums[left] <= target && target < nums[mid])
                 nums[mid], nums[high] = nums[high], nums[mid]
                 high -= 1`
     },
-    
+
     {
-      id: 29,
-      title: "Linked List Cycle",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Check if a linked list has a cycle using two pointers.",
-      javaCode: `
+        id: 29,
+        title: "Linked List Cycle",
+        difficulty: "Easy",
+        category: "Linked List",
+        description: "Check if a linked list has a cycle using two pointers.",
+        javaCode: `
     public boolean hasCycle(ListNode head) {
         if (head == null  head.next == null) return false;
         ListNode slow = head, fast = head.next;
@@ -1466,7 +1448,7 @@ f (nums[left] <= target && target < nums[mid])
         }
         return true;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def hasCycle(head):
         slow = fast = head
         while fast and fast.next:
@@ -1475,15 +1457,15 @@ f (nums[left] <= target && target < nums[mid])
             if slow == fast:
                 return True
         return False`
-    },
-    
-    {
-      id: 30,
-      title: "Palindrome Linked List",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Check if a singly linked list is a palindrome.",
-      javaCode: `
+},
+
+{
+    id: 30,
+        title: "Palindrome Linked List",
+            difficulty: "Easy",
+                category: "Linked List",
+                    description: "Check if a singly linked list is a palindrome.",
+                        javaCode: `
     public boolean isPalindrome(ListNode head) {
         ListNode slow = head, fast = head;
         while (fast != null && fast.next != null) {
@@ -1507,7 +1489,7 @@ f (nums[left] <= target && target < nums[mid])
     
         return true;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isPalindrome(head):
         slow, fast = head, head
         while fast and fast.next:
@@ -1515,9 +1497,7 @@ f (nums[left] <= target && target < nums[mid])
             fast = fast.next.next
     
         prev = None
-
-PR!nce, [24-04-2025 22:39]
-while slow:
+        while slow:
             next_node = slow.next
             slow.next = prev
             prev = slow
@@ -1529,15 +1509,15 @@ while slow:
             head = head.next
             prev = prev.next
         return True`
-    },
-    
-    {
-      id: 31,
-      title: "Detect Cycle in a Directed Graph",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Given a directed graph, check whether the graph contains a cycle or not.",
-      javaCode: `
+},
+
+{
+    id: 31,
+        title: "Detect Cycle in a Directed Graph",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Given a directed graph, check whether the graph contains a cycle or not.",
+                        javaCode: `
     public boolean isCyclic(int V, List<List<Integer>> adj) {
         boolean[] visited = new boolean[V];
         boolean[] recStack = new boolean[V];
@@ -1560,7 +1540,7 @@ while slow:
         recStack[v] = false;
         return false;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isCyclic(V, adj):
         visited = [False] * V
         recStack = [False] * V
@@ -1582,15 +1562,15 @@ while slow:
                 if dfs(node):
                     return True
         return False`
-    },
+},
 
-    {
-      id: 32,
-      title: "Kth Largest Element in an Array",
-      difficulty: "Medium",
-      category: "Heap",
-      description: "Find the kth largest element in an unsorted array.",
-      javaCode: `
+{
+    id: 32,
+        title: "Kth Largest Element in an Array",
+            difficulty: "Medium",
+                category: "Heap",
+                    description: "Find the kth largest element in an unsorted array.",
+                        javaCode: `
     public int findKthLargest(int[] nums, int k) {
         PriorityQueue<Integer> minHeap = new PriorityQueue<>();
         for (int num : nums) {
@@ -1599,20 +1579,19 @@ while slow:
         }
         return minHeap.peek();
     }`,
-      pythonCode: `
+                            pythonCode: `
     import heapq
     def findKthLargest(nums, k):
         return heapq.nlargest(k, nums)[-1]`
-    },
+},
 
-PR!nce, [24-04-2025 22:39]
 {
-      id: 33,
-      title: "Course Schedule",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "There are a total of numCourses you have to take, labeled from 0 to numCourses - 1. Determine if it is possible to finish all courses.",
-      javaCode: `
+    id: 33,
+        title: "Course Schedule",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "There are a total of numCourses you have to take, labeled from 0 to numCourses - 1. Determine if it is possible to finish all courses.",
+                        javaCode: `
     public boolean canFinish(int numCourses, int[][] prerequisites) {
         List<List<Integer>> graph = new ArrayList<>();
         for (int i = 0; i < numCourses; i++) graph.add(new ArrayList<>());
@@ -1636,7 +1615,7 @@ PR!nce, [24-04-2025 22:39]
         visited[course] = 2;
         return true;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def canFinish(numCourses, prerequisites):
         graph = [[] for _ in range(numCourses)]
         for a, b in prerequisites:
@@ -1658,15 +1637,15 @@ PR!nce, [24-04-2025 22:39]
             return True
     
         return all(dfs(i) for i in range(numCourses))`
-    },
-    
-    {
-      id: 34,
-      title: "Combination Sum",
-      difficulty: "Medium",
-      category: "Backtracking",
-      description: "Return all unique combinations that sum to a target using unlimited instances of elements.",
-      javaCode: `
+},
+
+{
+    id: 34,
+        title: "Combination Sum",
+            difficulty: "Medium",
+                category: "Backtracking",
+                    description: "Return all unique combinations that sum to a target using unlimited instances of elements.",
+                        javaCode: `
     public List<List<Integer>> combinationSum(int[] candidates, int target) {
         List<List<Integer>> result = new ArrayList<>();
         backtrack(candidates, target, 0, new ArrayList<>(), result);
@@ -1686,7 +1665,7 @@ PR!nce, [24-04-2025 22:39]
             }
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     def combinationSum(candidates, target):
         result = []
     
@@ -1702,15 +1681,15 @@ PR!nce, [24-04-2025 22:39]
     
         backtrack(target, [], 0)
         return result`
-    },
-    
-    {
-      id: 35,
-      title: "Permutations",
-      difficulty: "Medium",
-      category: "Backtracking",
-      description: "Return all possible permutations of a list of numbers.",
-      javaCode: `
+},
+
+{
+    id: 35,
+        title: "Permutations",
+            difficulty: "Medium",
+                category: "Backtracking",
+                    description: "Return all possible permutations of a list of numbers.",
+                        javaCode: `
     public List<List<Integer>> permute(int[] nums) {
         List<List<Integer>> result = new ArrayList<>();
         backtrack(nums, new ArrayList<>(), result);
@@ -1726,12 +1705,10 @@ PR!nce, [24-04-2025 22:39]
             if (tempList.contains(num)) continue;
             tempList.add(num);
             backtrack(nums, tempList, result);
-
-PR!nce, [24-04-2025 22:39]
-tempList.remove(tempList.size() - 1);
+            tempList.remove(tempList.size() - 1);
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     def permute(nums):
         result = []
     
@@ -1750,15 +1727,15 @@ tempList.remove(tempList.size() - 1);
     
         backtrack([], [False] * len(nums))
         return result`
-    },
-    
-    {
-      id: 36,
-      title: "Rotate Image",
-      difficulty: "Medium",
-      category: "Matrix",
-      description: "Rotate an n x n 2D matrix by 90 degrees (clockwise) in-place.",
-      javaCode: `
+},
+
+{
+    id: 36,
+        title: "Rotate Image",
+            difficulty: "Medium",
+                category: "Matrix",
+                    description: "Rotate an n x n 2D matrix by 90 degrees (clockwise) in-place.",
+                        javaCode: `
     public void rotate(int[][] matrix) {
         int n = matrix.length;
         for (int i = 0; i < n; i++) {
@@ -1776,7 +1753,7 @@ tempList.remove(tempList.size() - 1);
             }
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     def rotate(matrix):
         n = len(matrix)
         for i in range(n):
@@ -1784,15 +1761,15 @@ tempList.remove(tempList.size() - 1);
                 matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]
         for row in matrix:
             row.reverse()`
-    },
-    
-    {
-      id: 37,
-      title: "Unique Paths",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Find the number of unique paths in an m x n grid, moving only down or right.",
-      javaCode: `
+},
+
+{
+    id: 37,
+        title: "Unique Paths",
+            difficulty: "Medium",
+                category: "Dynamic Programming",
+                    description: "Find the number of unique paths in an m x n grid, moving only down or right.",
+                        javaCode: `
     public int uniquePaths(int m, int n) {
         int[][] dp = new int[m][n];
         for (int i = 0; i < m; i++) dp[i][0] = 1;
@@ -1806,22 +1783,22 @@ tempList.remove(tempList.size() - 1);
     
         return dp[m - 1][n - 1];
     }`,
-      pythonCode: `
+                            pythonCode: `
     def uniquePaths(m, n):
         dp = [[1]*n for _ in range(m)]
         for i in range(1, m):
             for j in range(1, n):
                 dp[i][j] = dp[i-1][j] + dp[i][j-1]
         return dp[-1][-1]`
-    },
-    
-    {
-      id: 38,
-      title: "Longest Common Subsequence",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Find the length of the longest common subsequence of two strings.",
-      javaCode: `
+},
+
+{
+    id: 38,
+        title: "Longest Common Subsequence",
+            difficulty: "Medium",
+                category: "Dynamic Programming",
+                    description: "Find the length of the longest common subsequence of two strings.",
+                        javaCode: `
     public int longestCommonSubsequence(String text1, String text2) {
         int m = text1.length(), n = text2.length();
         int[][] dp = new int[m+1][n+1];
@@ -1837,7 +1814,7 @@ tempList.remove(tempList.size() - 1);
         }
         return dp[m][n];
     }`,
-      pythonCode: `
+                            pythonCode: `
     def longestCommonSubsequence(text1, text2):
         m, n = len(text1), len(text2)
         dp = [[0]*(n+1) for _ in range(m+1)]
@@ -1849,16 +1826,15 @@ tempList.remove(tempList.size() - 1);
                 else:
                     dp[i+1][j+1] = max(dp[i][j+1], dp[i+1][j])
         return dp[m][n]`
-    },
+},
 
-PR!nce, [24-04-2025 22:39]
 {
-      id: 39,
-      title: "Climbing Stairs",
-      difficulty: "Easy",
-      category: "Dynamic Programming",
-      description: "You can climb 1 or 2 steps. Find how many distinct ways you can climb to the top.",
-      javaCode: `
+    id: 39,
+        title: "Climbing Stairs",
+            difficulty: "Easy",
+                category: "Dynamic Programming",
+                    description: "You can climb 1 or 2 steps. Find how many distinct ways you can climb to the top.",
+                        javaCode: `
     public int climbStairs(int n) {
         if (n <= 2) return n;
         int a = 1, b = 2;
@@ -1869,7 +1845,7 @@ PR!nce, [24-04-2025 22:39]
         }
         return b;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def climbStairs(n):
         if n <= 2:
             return n
@@ -1877,15 +1853,15 @@ PR!nce, [24-04-2025 22:39]
         for _ in range(3, n+1):
             a, b = b, a + b
         return b`
-    },
-    
-    {
-      id: 40,
-      title: "Coin Change",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Given coins of different denominations and a total amount, find the fewest number of coins needed.",
-      javaCode: `
+},
+
+{
+    id: 40,
+        title: "Coin Change",
+            difficulty: "Medium",
+                category: "Dynamic Programming",
+                    description: "Given coins of different denominations and a total amount, find the fewest number of coins needed.",
+                        javaCode: `
     public int coinChange(int[] coins, int amount) {
         int[] dp = new int[amount + 1];
         Arrays.fill(dp, amount + 1);
@@ -1901,7 +1877,7 @@ PR!nce, [24-04-2025 22:39]
     
         return dp[amount] > amount ? -1 : dp[amount];
     }`,
-      pythonCode: `
+                            pythonCode: `
     def coinChange(coins, amount):
         dp = [amount + 1] * (amount + 1)
         dp[0] = 0
@@ -1910,15 +1886,15 @@ PR!nce, [24-04-2025 22:39]
                 if coin <= i:
                     dp[i] = min(dp[i], dp[i - coin] + 1)
         return dp[amount] if dp[amount] <= amount else -1`
-    },
-    
-    {
-      id: 41,
-      title: "Maximum Subarray",
-      difficulty: "Easy",
-      category: "Dynamic Programming",
-      description: "Find the contiguous subarray with the largest sum.",
-      javaCode: `
+},
+
+{
+    id: 41,
+        title: "Maximum Subarray",
+            difficulty: "Easy",
+                category: "Dynamic Programming",
+                    description: "Find the contiguous subarray with the largest sum.",
+                        javaCode: `
     public int maxSubArray(int[] nums) {
         int maxSoFar = nums[0], maxEndingHere = nums[0];
         for (int i = 1; i < nums.length; i++) {
@@ -1927,7 +1903,7 @@ PR!nce, [24-04-2025 22:39]
         }
         return maxSoFar;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def maxSubArray(nums):
         max_so_far = nums[0]
         current_max = nums[0]
@@ -1935,15 +1911,15 @@ PR!nce, [24-04-2025 22:39]
             current_max = max(nums[i], current_max + nums[i])
             max_so_far = max(max_so_far, current_max)
         return max_so_far`
-    },
-    
-    {
-      id: 42,
-      title: "Minimum Path Sum",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Find a path from top-left to bottom-right of a grid with minimum sum.",
-      javaCode: `
+},
+
+{
+    id: 42,
+        title: "Minimum Path Sum",
+            difficulty: "Medium",
+                category: "Dynamic Programming",
+                    description: "Find a path from top-left to bottom-right of a grid with minimum sum.",
+                        javaCode: `
     public int minPathSum(int[][] grid) {
         int m = grid.length, n = grid[0].length;
         for (int i = 1; i < m; i++) grid[i][0] += grid[i-1][0];
@@ -1956,7 +1932,7 @@ PR!nce, [24-04-2025 22:39]
         }
         return grid[m-1][n-1];
     }`,
-      pythonCode: `
+                            pythonCode: `
     def minPathSum(grid):
         m, n = len(grid), len(grid[0])
         for i in range(1, m):
@@ -1967,15 +1943,15 @@ PR!nce, [24-04-2025 22:39]
             for j in range(1, n):
                 grid[i][j] += min(grid[i-1][j], grid[i][j-1])
         return grid[-1][-1]`
-    },
-    
-    {
-      id: 43,
-      title: "Longest Increasing Subsequence",
-      difficulty: "Medium",
-      category: "Dynamic Programming",
-      description: "Find the length of the longest increasing subsequence in an array.",
-      javaCode: `
+},
+
+{
+    id: 43,
+        title: "Longest Increasing Subsequence",
+            difficulty: "Medium",
+                category: "Dynamic Programming",
+                    description: "Find the length of the longest increasing subsequence in an array.",
+                        javaCode: `
     public int lengthOfLIS(int[] nums) {
         int[] dp = new int[nums.length];
         int len = 0;
@@ -1983,13 +1959,11 @@ PR!nce, [24-04-2025 22:39]
             int i = Arrays.binarySearch(dp, 0, len, num);
             if (i < 0) i = -(i + 1);
             dp[i] = num;
-
-PR!nce, [24-04-2025 22:39]
-if (i == len) len++;
+            if (i == len) len++;
         }
         return len;
     }`,
-      pythonCode: `
+                            pythonCode: `
     import bisect
     def lengthOfLIS(nums):
         sub = []
@@ -2000,15 +1974,15 @@ if (i == len) len++;
             else:
                 sub[i] = x
         return len(sub)`
-    },
-    
-    {
-      id: 44,
-      title: "Validate Binary Search Tree",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Given a binary tree, check if it is a valid binary search tree (BST).",
-      javaCode: `
+},
+
+{
+    id: 44,
+        title: "Validate Binary Search Tree",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Given a binary tree, check if it is a valid binary search tree (BST).",
+                        javaCode: `
     public boolean isValidBST(TreeNode root) {
         return validate(root, Long.MIN_VALUE, Long.MAX_VALUE);
     }
@@ -2018,7 +1992,7 @@ if (i == len) len++;
         if (node.val <= min  node.val >= max) return false;
         return validate(node.left, min, node.val) && validate(node.right, node.val, max);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isValidBST(root):
         def validate(node, low, high):
             if not node:
@@ -2027,15 +2001,15 @@ if (i == len) len++;
                 return False
             return validate(node.left, low, node.val) and validate(node.right, node.val, high)
         return validate(root, float('-inf'), float('inf'))`
-    },
-    
-    {
-      id: 45,
-      title: "Invert Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Invert a binary tree (mirror it).",
-      javaCode: `
+},
+
+{
+    id: 45,
+        title: "Invert Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Invert a binary tree (mirror it).",
+                        javaCode: `
     public TreeNode invertTree(TreeNode root) {
         if (root == null) return null;
         TreeNode left = invertTree(root.left);
@@ -2044,21 +2018,21 @@ if (i == len) len++;
         root.right = left;
         return root;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def invertTree(root):
         if not root:
             return None
         root.left, root.right = invertTree(root.right), invertTree(root.left)
         return root`
-    },
-    
-    {
-      id: 46,
-      title: "Symmetric Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Check whether a binary tree is symmetric around its center.",
-      javaCode: `
+},
+
+{
+    id: 46,
+        title: "Symmetric Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Check whether a binary tree is symmetric around its center.",
+                        javaCode: `
     public boolean isSymmetric(TreeNode root) {
         if (root == null) return true;
         return isMirror(root.left, root.right);
@@ -2071,7 +2045,7 @@ if (i == len) len++;
             && isMirror(t1.left, t2.right)
             && isMirror(t1.right, t2.left);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isSymmetric(root):
         def isMirror(t1, t2):
             if not t1 and not t2:
@@ -2082,15 +2056,15 @@ if (i == len) len++;
                     isMirror(t1.left, t2.right) and
                     isMirror(t1.right, t2.left))
         return isMirror(root, root)`
-    },
-    
-    {
-      id: 47,
-      title: "Diameter of Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given a binary tree, return the length of the diameter of the tree. The diameter of a binary tree is the length of the longest path between any two nodes in a tree.",
-      javaCode: `
+},
+
+{
+    id: 47,
+        title: "Diameter of Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given a binary tree, return the length of the diameter of the tree. The diameter of a binary tree is the length of the longest path between any two nodes in a tree.",
+                        javaCode: `
     public int diameterOfBinaryTree(TreeNode root) {
         int[] diameter = new int[1];
         depth(root, diameter);
@@ -2104,7 +2078,7 @@ if (i == len) len++;
         diameter[0] = Math.max(diameter[0], left + right);
         return 1 + Math.max(left, right);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def diameterOfBinaryTree(root):
         diameter = [0]
         
@@ -2114,39 +2088,37 @@ if (i == len) len++;
             left = depth(node.left)
             right = depth(node.right)
             diameter[0] = max(diameter[0], left + right)
-
-PR!nce, [24-04-2025 22:39]
-return 1 + max(left, right)
+            return 1 + max(left, right)
         
         depth(root)
         return diameter[0]`
-    },
-    
-    {
-      id: 48,
-      title: "Maximum Depth of Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given the root of a binary tree, return its maximum depth. A binary tree's maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.",
-      javaCode: `
+},
+
+{
+    id: 48,
+        title: "Maximum Depth of Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given the root of a binary tree, return its maximum depth. A binary tree's maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.",
+                        javaCode: `
     public int maxDepth(TreeNode root) {
         if (root == null) return 0;
         return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
     }`,
-      pythonCode: `
+                            pythonCode: `
     def maxDepth(root):
         if not root:
             return 0
         return 1 + max(maxDepth(root.left), maxDepth(root.right))`
-    },
-    
-    {
-      id: 49,
-      title: "Balanced Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Determine if a binary tree is height-balanced. A height-balanced binary tree is defined as a binary tree in which the left and right subtrees of every node differ in height by no more than 1.",
-      javaCode: `
+},
+
+{
+    id: 49,
+        title: "Balanced Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Determine if a binary tree is height-balanced. A height-balanced binary tree is defined as a binary tree in which the left and right subtrees of every node differ in height by no more than 1.",
+                        javaCode: `
     public boolean isBalanced(TreeNode root) {
         return checkHeight(root) != -1;
     }
@@ -2160,7 +2132,7 @@ return 1 + max(left, right)
         if (Math.abs(left - right) > 1) return -1;
         return Math.max(left, right) + 1;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isBalanced(root):
         def check(node):
             if not node:
@@ -2173,15 +2145,15 @@ return 1 + max(left, right)
                 return -1
             return max(left, right) + 1
         return check(root) != -1`
-    },
-    
-    {
-      id: 50,
-      title: "Binary Tree Level Order Traversal",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Given the root of a binary tree, return the level order traversal of its nodes' values (from left to right, level by level).",
-      javaCode: `
+},
+
+{
+    id: 50,
+        title: "Binary Tree Level Order Traversal",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Given the root of a binary tree, return the level order traversal of its nodes' values (from left to right, level by level).",
+                        javaCode: `
     public List<List<Integer>> levelOrder(TreeNode root) {
         List<List<Integer>> result = new ArrayList<>();
         if (root == null) return result;
@@ -2200,7 +2172,7 @@ return 1 + max(left, right)
         }
         return result;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def levelOrder(root):
         if not root:
             return []
@@ -2217,15 +2189,15 @@ return 1 + max(left, right)
                     queue.append(node.right)
             res.append(level)
         return res`
-    },
-    
-    {
-      id: 50,
-      title: "Binary Tree Level Order Traversal",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Given the root of a binary tree, return the level order traversal of its nodes' values (from left to right, level by level).",
-      javaCode: `
+},
+
+{
+    id: 50,
+        title: "Binary Tree Level Order Traversal",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Given the root of a binary tree, return the level order traversal of its nodes' values (from left to right, level by level).",
+                        javaCode: `
     public List<List<Integer>> levelOrder(TreeNode root) {
         List<List<Integer>> result = new ArrayList<>();
         if (root == null) return result;
@@ -2234,9 +2206,7 @@ return 1 + max(left, right)
         while (!queue.isEmpty()) {
             int size = queue.size();
             List<Integer> level = new ArrayList<>();
-
-PR!nce, [24-04-2025 22:39]
-for (int i = 0; i < size; i++) {
+            for (int i = 0; i < size; i++) {
                 TreeNode node = queue.poll();
                 level.add(node.val);
                 if (node.left != null) queue.offer(node.left);
@@ -2246,7 +2216,7 @@ for (int i = 0; i < size; i++) {
         }
         return result;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def levelOrder(root):
         if not root:
             return []
@@ -2263,15 +2233,15 @@ for (int i = 0; i < size; i++) {
                     queue.append(node.right)
             res.append(level)
         return res`
-    },
+},
 
-    {
-      id: 51,
-      title: "Bellman-Ford Algorithm",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Find shortest paths from the source vertex to all vertices in a weighted graph with possible negative weights.",
-      javaCode: `
+{
+    id: 51,
+        title: "Bellman-Ford Algorithm",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Find shortest paths from the source vertex to all vertices in a weighted graph with possible negative weights.",
+                        javaCode: `
         public int[] bellmanFord(int vertices, int[][] edges, int source) {
             int[] dist = new int[vertices];
             Arrays.fill(dist, Integer.MAX_VALUE);
@@ -2295,7 +2265,7 @@ for (int i = 0; i < size; i++) {
             
             return dist;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def bellman_ford(vertices, edges, source):
             dist = [float('inf')] * vertices
             dist[source] = 0
@@ -2310,15 +2280,15 @@ for (int i = 0; i < size; i++) {
                     raise ValueError("Graph contains a negative-weight cycle")
             
             return dist`
-    },    
-    
-    {
-      id: 52,
-      title: "Merge Two Sorted Lists",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Merge two sorted linked lists and return it as a new list. The new list should be made by splicing together the nodes of the first two lists.",
-      javaCode: `
+},
+
+{
+    id: 52,
+        title: "Merge Two Sorted Lists",
+            difficulty: "Easy",
+                category: "Linked List",
+                    description: "Merge two sorted linked lists and return it as a new list. The new list should be made by splicing together the nodes of the first two lists.",
+                        javaCode: `
     public ListNode mergeTwoLists(ListNode l1, ListNode l2) {
         ListNode dummy = new ListNode(0);
         ListNode current = dummy;
@@ -2337,7 +2307,7 @@ for (int i = 0; i < size; i++) {
         current.next = (l1 != null) ? l1 : l2;
         return dummy.next;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def mergeTwoLists(l1, l2):
         dummy = ListNode()
         current = dummy
@@ -2351,17 +2321,15 @@ for (int i = 0; i < size; i++) {
             current = current.next
         current.next = l1 or l2
         return dummy.next`
-    },
-    
-    {
-      id: 53,
-      title: "Linked List Cycle",
-      difficulty: "Easy",
-      category: "Linked List",
+},
 
-PR!nce, [24-04-2025 22:39]
-description: "Given a linked list, determine if it has a cycle in it using Floyd's Cycle-Finding Algorithm.",
-      javaCode: `
+{
+    id: 53,
+        title: "Linked List Cycle",
+            difficulty: "Easy",
+                category: "Linked List",
+    description: "Given a linked list, determine if it has a cycle in it using Floyd's Cycle-Finding Algorithm.",
+        javaCode: `
     public boolean hasCycle(ListNode head) {
         if (head == null  head.next == null) return false;
         ListNode slow = head, fast = head.next;
@@ -2373,7 +2341,7 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
         }
         return true;
     }`,
-      pythonCode: `
+            pythonCode: `
     def hasCycle(head):
         slow = fast = head
         while fast and fast.next:
@@ -2382,15 +2350,15 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
             if slow == fast:
                 return True
         return False`
-    },
-    
-    {
-      id: 54,
-      title: "Reverse Linked List",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Reverse a singly linked list.",
-      javaCode: `
+},
+
+{
+    id: 54,
+        title: "Reverse Linked List",
+            difficulty: "Easy",
+                category: "Linked List",
+                    description: "Reverse a singly linked list.",
+                        javaCode: `
     public ListNode reverseList(ListNode head) {
         ListNode prev = null;
         while (head != null) {
@@ -2401,7 +2369,7 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
         }
         return prev;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def reverseList(head):
         prev = None
         while head:
@@ -2410,15 +2378,15 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
             prev = head
             head = next_node
         return prev`
-    },
-    
-    {
-      id: 55,
-      title: "Palindrome Linked List",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Check if a singly linked list is a palindrome.",
-      javaCode: `
+},
+
+{
+    id: 55,
+        title: "Palindrome Linked List",
+            difficulty: "Easy",
+                category: "Linked List",
+                    description: "Check if a singly linked list is a palindrome.",
+                        javaCode: `
     public boolean isPalindrome(ListNode head) {
         ListNode slow = head, fast = head;
         while (fast != null && fast.next != null) {
@@ -2441,7 +2409,7 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
         }
         return true;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isPalindrome(head):
         slow = fast = head
         while fast and fast.next:
@@ -2461,15 +2429,15 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
             head = head.next
             prev = prev.next
         return True`
-    },
-    
-    {
-      id: 56,
-      title: "Remove Duplicates from Sorted List",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Given the head of a sorted linked list, delete all duplicates such that each element appears only once.",
-      javaCode: `
+},
+
+{
+    id: 56,
+        title: "Remove Duplicates from Sorted List",
+            difficulty: "Easy",
+                category: "Linked List",
+                    description: "Given the head of a sorted linked list, delete all duplicates such that each element appears only once.",
+                        javaCode: `
     public ListNode deleteDuplicates(ListNode head) {
         ListNode current = head;
         while (current != null && current.next != null) {
@@ -2481,7 +2449,7 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
         }
         return head;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def deleteDuplicates(head):
         current = head
         while current and current.next:
@@ -2490,41 +2458,39 @@ description: "Given a linked list, determine if it has a cycle in it using Floyd
             else:
                 current = current.next
         return head`
-    },
-    
-    {
-      id: 57,
-      title: "Intersection of Two Linked Lists",
-      difficulty: "Easy",
-      category: "Linked List",
-      description: "Given the heads of two singly linked lists, return the node at which the two lists intersect. If no intersection, return null.",
-      javaCode: `
+},
+
+{
+    id: 57,
+        title: "Intersection of Two Linked Lists",
+            difficulty: "Easy",
+                category: "Linked List",
+                    description: "Given the heads of two singly linked lists, return the node at which the two lists intersect. If no intersection, return null.",
+                        javaCode: `
     public ListNode getIntersectionNode(ListNode headA, ListNode headB) {
         ListNode a = headA, b = headB;
-
-PR!nce, [24-04-2025 22:39]
-while (a != b) {
+        while (a != b) {
             a = (a == null) ? headB : a.next;
             b = (b == null) ? headA : b.next;
         }
         return a;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def getIntersectionNode(headA, headB):
         a, b = headA, headB
         while a != b:
             a = headB if not a else a.next
             b = headA if not b else b.next
         return a`
-    },
-    
-    {
-      id: 58,
-      title: "Add Two Numbers",
-      difficulty: "Medium",
-      category: "Linked List",
-      description: "You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order. Add the two numbers and return the sum as a linked list.",
-      javaCode: `
+},
+
+{
+    id: 58,
+        title: "Add Two Numbers",
+            difficulty: "Medium",
+                category: "Linked List",
+                    description: "You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order. Add the two numbers and return the sum as a linked list.",
+                        javaCode: `
     public ListNode addTwoNumbers(ListNode l1, ListNode l2) {
         ListNode dummy = new ListNode(0);
         ListNode curr = dummy;
@@ -2546,7 +2512,7 @@ while (a != b) {
         }
         return dummy.next;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def addTwoNumbers(l1, l2):
         dummy = ListNode()
         current = dummy
@@ -2565,15 +2531,15 @@ while (a != b) {
             current = current.next
         
         return dummy.next`
-    },
-    
-    {
-      id: 59,
-      title: "LRU Cache",
-      difficulty: "Hard",
-      category: "Design",
-      description: "Design a data structure that follows the constraints of a Least Recently Used (LRU) cache. Implement LRUCache with get and put operations.",
-      javaCode: `
+},
+
+{
+    id: 59,
+        title: "LRU Cache",
+            difficulty: "Hard",
+                category: "Design",
+                    description: "Design a data structure that follows the constraints of a Least Recently Used (LRU) cache. Implement LRUCache with get and put operations.",
+                        javaCode: `
     class LRUCache extends LinkedHashMap<Integer, Integer> {
         private int capacity;
     
@@ -2595,7 +2561,7 @@ while (a != b) {
             return size() > capacity;
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     from collections import OrderedDict
     
     class LRUCache:
@@ -2615,15 +2581,15 @@ while (a != b) {
             self.cache[key] = value
             if len(self.cache) > self.capacity:
                 self.cache.popitem(last=False)`
-    },
-    
-    {
-      id: 60,
-      title: "Clone Graph",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Given a reference of a node in a connected undirected graph, return a deep copy (clone) of the graph.",
-      javaCode: `
+},
+
+{
+    id: 60,
+        title: "Clone Graph",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Given a reference of a node in a connected undirected graph, return a deep copy (clone) of the graph.",
+                        javaCode: `
     public Node cloneGraph(Node node) {
         if (node == null) return null;
         Map<Node, Node> map = new HashMap<>();
@@ -2639,10 +2605,8 @@ while (a != b) {
         }
         return copy;
     }`,
-      pythonCode: `
-
-PR!nce, [24-04-2025 22:39]
-def cloneGraph(node):
+                            pythonCode: `
+    def cloneGraph(node):
         if not node:
             return None
         visited = {}
@@ -2657,15 +2621,15 @@ def cloneGraph(node):
             return copy
     
         return dfs(node)`
-    },
-    
-    {
-      id: 61,
-      title: "Course Schedule",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "There are a total of numCourses you have to take. Some courses have prerequisites. Determine if you can finish all courses.",
-      javaCode: `
+},
+
+{
+    id: 61,
+        title: "Course Schedule",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "There are a total of numCourses you have to take. Some courses have prerequisites. Determine if you can finish all courses.",
+                        javaCode: `
     public boolean canFinish(int numCourses, int[][] prerequisites) {
         List<List<Integer>> graph = new ArrayList<>();
         int[] indegree = new int[numCourses];
@@ -2690,7 +2654,7 @@ def cloneGraph(node):
         }
         return count == numCourses;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def canFinish(numCourses, prerequisites):
         graph = [[] for _ in range(numCourses)]
         indegree = [0] * numCourses
@@ -2710,27 +2674,27 @@ def cloneGraph(node):
                     queue.append(neighbor)
     
         return count == numCourses`
-    },
-    
-    {
-      id: 62,
-      title: "Pacific Atlantic Water Flow",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Given an m x n matrix of non-negative integers representing the height of each unit cell, find all cells that can flow to both the Pacific and Atlantic ocean.",
-      javaCode: `
+},
+
+{
+    id: 62,
+        title: "Pacific Atlantic Water Flow",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Given an m x n matrix of non-negative integers representing the height of each unit cell, find all cells that can flow to both the Pacific and Atlantic ocean.",
+                        javaCode: `
     // Too long for full code — consider referencing Leetcode 417
     `,
-      pythonCode: `# Similar — typically uses DFS/BFS from borders`
-    },
-    
-    {
-      id: 63,
-      title: "Number of Islands",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Given an m x n 2D grid map of '1's (land) and '0's (water), return the number of islands. An island is surrounded by water and is formed by connecting adjacent lands.",
-      javaCode: `
+                            pythonCode: `# Similar — typically uses DFS/BFS from borders`
+},
+
+{
+    id: 63,
+        title: "Number of Islands",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Given an m x n 2D grid map of '1's (land) and '0's (water), return the number of islands. An island is surrounded by water and is formed by connecting adjacent lands.",
+                        javaCode: `
     public int numIslands(char[][] grid) {
         int count = 0;
         for (int i = 0; i < grid.length; i++) {
@@ -2753,15 +2717,13 @@ def cloneGraph(node):
         dfs(grid, i, j + 1);
         dfs(grid, i, j - 1);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def numIslands(grid):
         if not grid:
             return 0
-        rows, cols = len(grid), len(grid[0])
-        count = 0
-    
+        
         def dfs(r, c):
-            if r < 0 or c < 0 or r >= rows or c >= cols or grid[r][c] == '0':
+            if r < 0 or c < 0 or r >= len(grid) or c >= len(grid[0]) or grid[r][c] == '0':
                 return
             grid[r][c] = '0'
             dfs(r+1, c)
@@ -2769,35 +2731,34 @@ def cloneGraph(node):
             dfs(r, c+1)
             dfs(r, c-1)
     
-        for r in range(rows):
-            for c in range(cols):
-
-PR!nce, [24-04-2025 22:39]
-if grid[r][c] == '1':
+        count = 0
+        for r in range(len(grid)):
+            for c in range(len(grid[0])):
+                if grid[r][c] == '1':
                     dfs(r, c)
                     count += 1
         return count`
-    },
-    
-    {
-      id: 64,
-      title: "Rotting Oranges",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Given a grid, each cell can be empty, a fresh orange, or a rotten orange. Every minute, any fresh orange adjacent to a rotten one becomes rotten. Return the minimum number of minutes until no fresh orange remains.",
-      javaCode: `
+},
+
+{
+    id: 64,
+        title: "Rotting Oranges",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Given a grid, each cell can be empty, a fresh orange, or a rotten orange. Every minute, any fresh orange adjacent to a rotten one becomes rotten. Return the minimum number of minutes until no fresh orange remains.",
+                        javaCode: `
     // BFS approach required; too long for inline — use queue of coordinates
     `,
-      pythonCode: `# Similar: multi-source BFS using queue`
-    },
-    
-    {
-      id: 65,
-      title: "Flood Fill",
-      difficulty: "Easy",
-      category: "Graph",
-      description: "An image is represented by an m x n integer grid. A value represents the color of the pixel. Implement the flood fill algorithm starting from a given pixel and replacing all connected pixels of the same color.",
-      javaCode: `
+                            pythonCode: `# Similar: multi-source BFS using queue`
+},
+
+{
+    id: 65,
+        title: "Flood Fill",
+            difficulty: "Easy",
+                category: "Graph",
+                    description: "An image is represented by an m x n integer grid. A value represents the color of the pixel. Implement the flood fill algorithm starting from a given pixel and replacing all connected pixels of the same color.",
+                        javaCode: `
     public int[][] floodFill(int[][] image, int sr, int sc, int color) {
         if (image[sr][sc] == color) return image;
         dfs(image, sr, sc, image[sr][sc], color);
@@ -2812,7 +2773,7 @@ if grid[r][c] == '1':
         dfs(image, r, c+1, oldColor, newColor);
         dfs(image, r, c-1, oldColor, newColor);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def floodFill(image, sr, sc, color):
         old_color = image[sr][sc]
         if old_color == color:
@@ -2829,27 +2790,27 @@ if grid[r][c] == '1':
     
         dfs(sr, sc)
         return image`
-    },
-    
-    {
-      id: 66,
-      title: "Clone Linked List with Random Pointer",
-      difficulty: "Medium",
-      category: "Linked List",
-      description: "A linked list is given where each node contains an additional random pointer. Clone the list in O(N) time and space.",
-      javaCode: `
+},
+
+{
+    id: 66,
+        title: "Clone Linked List with Random Pointer",
+            difficulty: "Medium",
+                category: "Linked List",
+                    description: "A linked list is given where each node contains an additional random pointer. Clone the list in O(N) time and space.",
+                        javaCode: `
     // Solution uses hashmap or interleaving method — long to inline
     `,
-      pythonCode: `# Use hashmap or interleaving technique to clone with random pointers`
-    },
-    
-    {
-      id: 67,
-      title: "Find Minimum in Rotated Sorted Array",
-      difficulty: "Medium",
-      category: "Binary Search",
-      description: "Given a rotated sorted array, find the minimum element. The array was originally sorted in ascending order but then rotated at some pivot.",
-      javaCode: `
+                            pythonCode: `# Use hashmap or interleaving technique to clone with random pointers`
+},
+
+{
+    id: 67,
+        title: "Find Minimum in Rotated Sorted Array",
+            difficulty: "Medium",
+                category: "Binary Search",
+                    description: "Given a rotated sorted array, find the minimum element. The array was originally sorted in ascending order but then rotated at some pivot.",
+                        javaCode: `
     public int findMin(int[] nums) {
         int left = 0, right = nums.length - 1;
         while (left < right) {
@@ -2862,7 +2823,7 @@ if grid[r][c] == '1':
         }
         return nums[left];
     }`,
-      pythonCode: `
+                            pythonCode: `
     def findMin(nums):
         left, right = 0, len(nums) - 1
         while left < right:
@@ -2872,15 +2833,15 @@ if grid[r][c] == '1':
             else:
                 right = mid
         return nums[left]`
-    },
-    
-    {
-      id: 68,
-      title: "Search in Rotated Sorted Array",
-      difficulty: "Medium",
-      category: "Binary Search",
-      description: "Given a rotated sorted array and a target value, return its index if found. Otherwise, return -1.",
-      javaCode: `
+},
+
+{
+    id: 68,
+        title: "Search in Rotated Sorted Array",
+            difficulty: "Medium",
+                category: "Binary Search",
+                    description: "Given a rotated sorted array and a target value, return its index if found. Otherwise, return -1.",
+                        javaCode: `
     public int search(int[] nums, int target) {
         int left = 0, right = nums.length - 1;
         while (left <= right) {
@@ -2888,9 +2849,7 @@ if grid[r][c] == '1':
             if (nums[mid] == target) return mid;
     
             if (nums[left] <= nums[mid]) {
-
-PR!nce, [24-04-2025 22:39]
-if (nums[left] <= target && target < nums[mid])
+                if (nums[left] <= target && target < nums[mid])
                     right = mid - 1;
                 else
                     left = mid + 1;
@@ -2903,7 +2862,7 @@ if (nums[left] <= target && target < nums[mid])
         }
         return -1;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def search(nums, target):
         left, right = 0, len(nums) - 1
         while left <= right:
@@ -2921,15 +2880,15 @@ if (nums[left] <= target && target < nums[mid])
                 else:
                     right = mid - 1
         return -1`
-    },
-    
-    {
-      id: 69,
-      title: "Implement Trie (Prefix Tree)",
-      difficulty: "Medium",
-      category: "Trie",
-      description: "Implement a trie with insert, search, and startsWith methods to handle string storage and prefix searching.",
-      javaCode: `
+},
+
+{
+    id: 69,
+        title: "Implement Trie (Prefix Tree)",
+            difficulty: "Medium",
+                category: "Trie",
+                    description: "Implement a trie with insert, search, and startsWith methods to handle string storage and prefix searching.",
+                        javaCode: `
     class Trie {
         class TrieNode {
             Map<Character, TrieNode> children = new HashMap<>();
@@ -2964,7 +2923,7 @@ if (nums[left] <= target && target < nums[mid])
             return true;
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     class TrieNode:
         def init(self):
             self.children = {}
@@ -2995,15 +2954,15 @@ if (nums[left] <= target && target < nums[mid])
                     return False
                 node = node.children[ch]
             return True`
-    },
-    
-    {
-      id: 70,
-      title: "Implement Stack using Queues",
-      difficulty: "Easy",
-      category: "Stack",
-      description: "Implement a last-in-first-out (LIFO) stack using only two queues. You must implement push, pop, top, and empty operations.",
-      javaCode: `
+},
+
+{
+    id: 70,
+        title: "Implement Stack using Queues",
+            difficulty: "Easy",
+                category: "Stack",
+                    description: "Implement a last-in-first-out (LIFO) stack using only two queues. You must implement push, pop, top, and empty operations.",
+                        javaCode: `
     class MyStack {
         Queue<Integer> q = new LinkedList<>();
     
@@ -3025,7 +2984,7 @@ if (nums[left] <= target && target < nums[mid])
             return q.isEmpty();
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     from collections import deque
     
     class MyStack:
@@ -3033,9 +2992,7 @@ if (nums[left] <= target && target < nums[mid])
             self.q = deque()
     
         def push(self, x):
-
-PR!nce, [24-04-2025 22:39]
-self.q.append(x)
+            self.q.append(x)
             for _ in range(len(self.q) - 1):
                 self.q.append(self.q.popleft())
     
@@ -3047,15 +3004,15 @@ self.q.append(x)
     
         def empty(self):
             return not self.q`
-    },
-    
-    {
-      id: 71,
-      title: "Daily Temperatures",
-      difficulty: "Medium",
-      category: "Stack",
-      description: "Given a list of daily temperatures, return a list such that each element tells you how many days you would have to wait until a warmer temperature.",
-      javaCode: `
+},
+
+{
+    id: 71,
+        title: "Daily Temperatures",
+            difficulty: "Medium",
+                category: "Stack",
+                    description: "Given a list of daily temperatures, return a list such that each element tells you how many days you would have to wait until a warmer temperature.",
+                        javaCode: `
     public int[] dailyTemperatures(int[] temps) {
         int[] res = new int[temps.length];
         Stack<Integer> stack = new Stack<>();
@@ -3068,7 +3025,7 @@ self.q.append(x)
         }
         return res;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def dailyTemperatures(T):
         res = [0] * len(T)
         stack = []
@@ -3078,15 +3035,15 @@ self.q.append(x)
                 res[idx] = i - idx
             stack.append(i)
         return res`
-    },
-    
-    {
-      id: 72,
-      title: "Valid Parentheses",
-      difficulty: "Easy",
-      category: "Stack",
-      description: "Given a string containing only brackets, determine if the input string is valid. A valid string is open-closed correctly and in order.",
-      javaCode: `
+},
+
+{
+    id: 72,
+        title: "Valid Parentheses",
+            difficulty: "Easy",
+                category: "Stack",
+                    description: "Given a string containing only brackets, determine if the input string is valid. A valid string is open-closed correctly and in order.",
+                        javaCode: `
     public boolean isValid(String s) {
         Stack<Character> stack = new Stack<>();
         for (char c : s.toCharArray()) {
@@ -3097,7 +3054,7 @@ self.q.append(x)
         }
         return stack.isEmpty();
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isValid(s):
         stack = []
         mapping = {')': '(', '}': '{', ']': '['}
@@ -3109,15 +3066,15 @@ self.q.append(x)
             else:
                 stack.append(char)
         return not stack`
-    },
-    
-    {
-      id: 73,
-      title: "Evaluate Reverse Polish Notation",
-      difficulty: "Medium",
-      category: "Stack",
-      description: "Evaluate the value of an arithmetic expression in Reverse Polish Notation. Valid operators are +, -, *, /.",
-      javaCode: `
+},
+
+{
+    id: 73,
+        title: "Evaluate Reverse Polish Notation",
+            difficulty: "Medium",
+                category: "Stack",
+                    description: "Evaluate the value of an arithmetic expression in Reverse Polish Notation. Valid operators are +, -, *, /.",
+                        javaCode: `
     public int evalRPN(String[] tokens) {
         Stack<Integer> stack = new Stack<>();
         for (String token : tokens) {
@@ -3135,7 +3092,7 @@ self.q.append(x)
         }
         return stack.pop();
     }`,
-      pythonCode: `
+                            pythonCode: `
     def evalRPN(tokens):
         stack = []
         for token in tokens:
@@ -3148,18 +3105,16 @@ self.q.append(x)
             else:
                 stack.append(int(token))
         return stack.pop()`
-    },
-    
-    {
-      id: 74,
-      title: "Car Fleet",
-      difficulty: "Medium",
-      category: "Stack",
-      description: "There are n cars traveling to a destination. Each car has a position and speed. A car fleet is formed when cars arrive together. Return the number of car fleets.",
-      javaCode: `
+},
 
-PR!nce, [24-04-2025 22:39]
-public int carFleet(int target, int[] position, int[] speed) {
+{
+    id: 74,
+        title: "Car Fleet",
+            difficulty: "Medium",
+                category: "Stack",
+                    description: "There are n cars traveling to a destination. Each car has a position and speed. A car fleet is formed when cars arrive together. Return the number of car fleets.",
+                        javaCode: `
+    public int carFleet(int target, int[] position, int[] speed) {
         int n = position.length;
         double[][] cars = new double[n][2];
         for (int i = 0; i < n; i++) {
@@ -3177,7 +3132,7 @@ public int carFleet(int target, int[] position, int[] speed) {
         }
         return fleets;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def carFleet(target, position, speed):
         pairs = sorted(zip(position, speed), reverse=True)
         stack = []
@@ -3186,15 +3141,15 @@ public int carFleet(int target, int[] position, int[] speed) {
             if not stack or time > stack[-1]:
                 stack.append(time)
         return len(stack)`
-    },
-    
-    {
-      id: 75,
-      title: "Largest Rectangle in Histogram",
-      difficulty: "Hard",
-      category: "Stack",
-      description: "Given an array of heights representing histogram bars, find the area of the largest rectangle in the histogram.",
-      javaCode: `
+},
+
+{
+    id: 75,
+        title: "Largest Rectangle in Histogram",
+            difficulty: "Hard",
+                category: "Stack",
+                    description: "Given an array of heights representing histogram bars, find the area of the largest rectangle in the histogram.",
+                        javaCode: `
     public int largestRectangleArea(int[] heights) {
         Stack<Integer> stack = new Stack<>();
         int maxArea = 0;
@@ -3209,7 +3164,7 @@ public int carFleet(int target, int[] position, int[] speed) {
         }
         return maxArea;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def largestRectangleArea(heights):
         stack = []
         heights.append(0)
@@ -3221,15 +3176,15 @@ public int carFleet(int target, int[] position, int[] speed) {
                 max_area = max(max_area, height * width)
             stack.append(i)
         return max_area`
-    },
-    
-    {
-      id: 76,
-      title: "Min Stack",
-      difficulty: "Easy",
-      category: "Stack",
-      description: "Design a stack that supports push, pop, top, and retrieving the minimum element in constant time.",
-      javaCode: `
+},
+
+{
+    id: 76,
+        title: "Min Stack",
+            difficulty: "Easy",
+                category: "Stack",
+                    description: "Design a stack that supports push, pop, top, and retrieving the minimum element in constant time.",
+                        javaCode: `
     class MinStack {
         private Stack<Integer> stack = new Stack<>();
         private Stack<Integer> minStack = new Stack<>();
@@ -3255,7 +3210,7 @@ public int carFleet(int target, int[] position, int[] speed) {
             return minStack.peek();
         }
     }`,
-      pythonCode: `
+                            pythonCode: `
     class MinStack:
         def init(self):
             self.stack = []
@@ -3275,22 +3230,20 @@ public int carFleet(int target, int[] position, int[] speed) {
     
         def getMin(self):
             return self.min_stack[-1]`
-    },
-    
-    {
-      id: 77,
-      title: "Binary Tree Inorder Traversal",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given the root of a binary tree, return the inorder traversal of its nodes' values.",
-      javaCode: `
+},
+
+{
+    id: 77,
+        title: "Binary Tree Inorder Traversal",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given the root of a binary tree, return the inorder traversal of its nodes' values.",
+                        javaCode: `
     public List<Integer> inorderTraversal(TreeNode root) {
         List<Integer> res = new ArrayList<>();
         Stack<TreeNode> stack = new Stack<>();
         TreeNode curr = root;
-
-PR!nce, [24-04-2025 22:39]
-while (curr != null  !stack.isEmpty()) {
+        while (curr != null  !stack.isEmpty()) {
             while (curr != null) {
                 stack.push(curr);
                 curr = curr.left;
@@ -3302,7 +3255,7 @@ while (curr != null  !stack.isEmpty()) {
     
         return res;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def inorderTraversal(root):
         res, stack = [], []
         curr = root
@@ -3314,15 +3267,15 @@ while (curr != null  !stack.isEmpty()) {
             res.append(curr.val)
             curr = curr.right
         return res`
-    },
-    
-    {
-      id: 78,
-      title: "Binary Tree Preorder Traversal",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given the root of a binary tree, return the preorder traversal of its nodes' values.",
-      javaCode: `
+},
+
+{
+    id: 78,
+        title: "Binary Tree Preorder Traversal",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given the root of a binary tree, return the preorder traversal of its nodes' values.",
+                        javaCode: `
     public List<Integer> preorderTraversal(TreeNode root) {
         List<Integer> res = new ArrayList<>();
         Stack<TreeNode> stack = new Stack<>();
@@ -3337,7 +3290,7 @@ while (curr != null  !stack.isEmpty()) {
     
         return res;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def preorderTraversal(root):
         if not root:
             return []
@@ -3350,15 +3303,15 @@ while (curr != null  !stack.isEmpty()) {
             if node.left:
                 stack.append(node.left)
         return res`
-    },
-    
-    {
-      id: 79,
-      title: "Binary Tree Postorder Traversal",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given the root of a binary tree, return the postorder traversal of its nodes' values.",
-      javaCode: `
+},
+
+{
+    id: 79,
+        title: "Binary Tree Postorder Traversal",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given the root of a binary tree, return the postorder traversal of its nodes' values.",
+                        javaCode: `
     public List<Integer> postorderTraversal(TreeNode root) {
         LinkedList<Integer> res = new LinkedList<>();
         Stack<TreeNode> stack = new Stack<>();
@@ -3373,7 +3326,7 @@ while (curr != null  !stack.isEmpty()) {
     
         return res;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def postorderTraversal(root):
         if not root:
             return []
@@ -3386,15 +3339,15 @@ while (curr != null  !stack.isEmpty()) {
             if node.right:
                 stack.append(node.right)
         return res[::-1]`
-    },
-    
-    {
-      id: 80,
-      title: "Invert Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Invert a binary tree by swapping the left and right children of every node.",
-      javaCode: `
+},
+
+{
+    id: 80,
+        title: "Invert Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Invert a binary tree by swapping the left and right children of every node.",
+                        javaCode: `
     public TreeNode invertTree(TreeNode root) {
         if (root == null) return null;
         TreeNode left = invertTree(root.left);
@@ -3403,21 +3356,21 @@ while (curr != null  !stack.isEmpty()) {
         root.right = left;
         return root;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def invertTree(root):
         if not root:
             return None
         root.left, root.right = invertTree(root.right), invertTree(root.left)
         return root`
-    },
-    
-    {
-      id: 81,
-      title: "Symmetric Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Check whether a binary tree is symmetric around its center.",
-      javaCode: `
+},
+
+{
+    id: 81,
+        title: "Symmetric Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Check whether a binary tree is symmetric around its center.",
+                        javaCode: `
     public boolean isSymmetric(TreeNode root) {
         return root == null  isMirror(root.left, root.right);
     }
@@ -3427,65 +3380,63 @@ while (curr != null  !stack.isEmpty()) {
         if (t1 == null  t2 == null) return false;
         return (t1.val == t2.val)
             && isMirror(t1.left, t2.right)
-
-PR!nce, [24-04-2025 22:39]
-&& isMirror(t1.right, t2.left);
+            && isMirror(t1.right, t2.left);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isSymmetric(root):
         def isMirror(t1, t2):
             if not t1 and not t2: return True
             if not t1 or not t2: return False
             return t1.val == t2.val and isMirror(t1.left, t2.right) and isMirror(t1.right, t2.left)
         return isMirror(root.left, root.right) if root else True`
-    },
-    
-    {
-      id: 82,
-      title: "Maximum Depth of Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given a binary tree, find its maximum depth. The maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.",
-      javaCode: `
+},
+
+{
+    id: 82,
+        title: "Maximum Depth of Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given a binary tree, find its maximum depth. The maximum depth is the number of nodes along the longest path from the root node down to the farthest leaf node.",
+                        javaCode: `
     public int maxDepth(TreeNode root) {
         if (root == null) return 0;
         return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
     }`,
-      pythonCode: `
+                            pythonCode: `
     def maxDepth(root):
         if not root:
             return 0
         return 1 + max(maxDepth(root.left), maxDepth(root.right))`
-    },
-    
-    {
-      id: 83,
-      title: "Same Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Check whether two binary trees are structurally identical and the nodes have the same values.",
-      javaCode: `
+},
+
+{
+    id: 83,
+        title: "Same Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Check whether two binary trees are structurally identical and the nodes have the same values.",
+                        javaCode: `
     public boolean isSameTree(TreeNode p, TreeNode q) {
         if (p == null && q == null) return true;
         if (p == null  q == null  p.val != q.val) return false;
         return isSameTree(p.left, q.left) && isSameTree(p.right, q.right);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isSameTree(p, q):
         if not p and not q:
             return True
         if not p or not q or p.val != q.val:
             return False
         return isSameTree(p.left, q.left) and isSameTree(p.right, q.right)`
-    },
-    
-    {
-      id: 84,
-      title: "Balanced Binary Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Check if a binary tree is height-balanced. A binary tree is balanced if the left and right subtrees differ in height by no more than 1.",
-      javaCode: `
+},
+
+{
+    id: 84,
+        title: "Balanced Binary Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Check if a binary tree is height-balanced. A binary tree is balanced if the left and right subtrees differ in height by no more than 1.",
+                        javaCode: `
     public boolean isBalanced(TreeNode root) {
         return checkHeight(root) != -1;
     }
@@ -3493,11 +3444,13 @@ PR!nce, [24-04-2025 22:39]
     private int checkHeight(TreeNode node) {
         if (node == null) return 0;
         int left = checkHeight(node.left);
+        if (left == -1) return -1;
         int right = checkHeight(node.right);
-        if (left == -1  right == -1  Math.abs(left - right) > 1) return -1;
-        return 1 + Math.max(left, right);
+        if (right == -1) return -1;
+        if (Math.abs(left - right) > 1) return -1;
+        return Math.max(left, right) + 1;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isBalanced(root):
         def height(node):
             if not node:
@@ -3508,36 +3461,36 @@ PR!nce, [24-04-2025 22:39]
                 return -1
             return 1 + max(left, right)
         return height(root) != -1`
-    },
-    
-    {
-      id: 85,
-      title: "Path Sum",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given a binary tree and a sum, check if the tree has a root-to-leaf path such that adding up all the values equals the given sum.",
-      javaCode: `
+},
+
+{
+    id: 85,
+        title: "Path Sum",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given a binary tree and a sum, check if the tree has a root-to-leaf path such that adding up all the values equals the given sum.",
+                        javaCode: `
     public boolean hasPathSum(TreeNode root, int sum) {
         if (root == null) return false;
         if (root.left == null && root.right == null) return root.val == sum;
         return hasPathSum(root.left, sum - root.val)  hasPathSum(root.right, sum - root.val);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def hasPathSum(root, targetSum):
         if not root:
             return False
         if not root.left and not root.right:
             return root.val == targetSum
         return hasPathSum(root.left, targetSum - root.val) or hasPathSum(root.right, targetSum - root.val)`
-    },
-    
-    {
-      id: 86,
-      title: "Lowest Common Ancestor of BST",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Given a Binary Search Tree, find the lowest common ancestor (LCA) of two given nodes in the BST.",
-      javaCode: `
+},
+
+{
+    id: 86,
+        title: "Lowest Common Ancestor of BST",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Given a Binary Search Tree, find the lowest common ancestor (LCA) of two given nodes in the BST.",
+                        javaCode: `
     public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
         if (p.val < root.val && q.val < root.val)
 
@@ -3548,7 +3501,7 @@ return lowestCommonAncestor(root.left, p, q);
         else
             return root;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def lowestCommonAncestor(root, p, q):
         if p.val < root.val and q.val < root.val:
             return lowestCommonAncestor(root.left, p, q)
@@ -3556,15 +3509,15 @@ return lowestCommonAncestor(root.left, p, q);
             return lowestCommonAncestor(root.right, p, q)
         else:
             return root`
-    },
-    
-    {
-      id: 87,
-      title: "Subtree of Another Tree",
-      difficulty: "Easy",
-      category: "Tree",
-      description: "Given two non-empty binary trees s and t, check whether t is a subtree of s. A subtree of s is a tree consisting of a node in s and all of its descendants.",
-      javaCode: `
+},
+
+{
+    id: 87,
+        title: "Subtree of Another Tree",
+            difficulty: "Easy",
+                category: "Tree",
+                    description: "Given two non-empty binary trees s and t, check whether t is a subtree of s. A subtree of s is a tree consisting of a node in s and all of its descendants.",
+                        javaCode: `
     public boolean isSubtree(TreeNode s, TreeNode t) {
         if (s == null) return false;
         if (isSameTree(s, t)) return true;
@@ -3576,7 +3529,7 @@ return lowestCommonAncestor(root.left, p, q);
         if (s == null  t == null  s.val != t.val) return false;
         return isSameTree(s.left, t.left) && isSameTree(s.right, t.right);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def isSubtree(s, t):
         if not s:
             return False
@@ -3590,15 +3543,15 @@ return lowestCommonAncestor(root.left, p, q);
         if not s or not t or s.val != t.val:
             return False
         return isSameTree(s.left, t.left) and isSameTree(s.right, t.right)`
-    },
-    
-    {
-      id: 88,
-      title: "Number of Islands",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Given a 2D grid of '1's (land) and '0's (water), return the number of islands. An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically.",
-      javaCode: `
+},
+
+{
+    id: 88,
+        title: "Number of Islands",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Given a 2D grid of '1's (land) and '0's (water), return the number of islands. An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically.",
+                        javaCode: `
     public int numIslands(char[][] grid) {
         int count = 0;
         for (int i = 0; i < grid.length; i++) {
@@ -3620,7 +3573,7 @@ return lowestCommonAncestor(root.left, p, q);
         dfs(grid, i, j - 1);
         dfs(grid, i, j + 1);
     }`,
-      pythonCode: `
+                            pythonCode: `
     def numIslands(grid):
         if not grid:
             return 0
@@ -3641,15 +3594,15 @@ return lowestCommonAncestor(root.left, p, q);
                     dfs(i, j)
                     count += 1
         return count`
-    },
-    
-    {
-      id: 89,
-      title: "Course Schedule",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "You are given `numCourses` and a list of prerequisites. Return true if it's possible to finish all courses. Detect cycle in a directed graph using DFS.",
-      javaCode: `
+},
+
+{
+    id: 89,
+        title: "Course Schedule",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "You are given `numCourses` and a list of prerequisites. Return true if it's possible to finish all courses. Detect cycle in a directed graph using DFS.",
+                        javaCode: `
     public boolean canFinish(int numCourses, int[][] prerequisites) {
         List<List<Integer>> graph = new ArrayList<>();
         for (int i = 0; i < numCourses; i++) graph.add(new ArrayList<>());
@@ -3674,7 +3627,7 @@ private boolean dfs(List<List<Integer>> graph, int[] visited, int i) {
         visited[i] = 2;
         return true;
     }`,
-      pythonCode: `
+                            pythonCode: `
     def canFinish(numCourses, prerequisites):
         graph = [[] for _ in range(numCourses)]
         for a, b in prerequisites:
@@ -3695,15 +3648,15 @@ private boolean dfs(List<List<Integer>> graph, int[] visited, int i) {
             return True
     
         return all(dfs(i) for i in range(numCourses))`
-    },
-    
-    {
-      id: 90,
-      title: "Alien Dictionary",
-      difficulty: "Hard",
-      category: "Graph",
-      description: "Given a sorted dictionary of alien language words, return the correct order of characters in the alien language.",
-      javaCode: `
+},
+
+{
+    id: 90,
+        title: "Alien Dictionary",
+            difficulty: "Hard",
+                category: "Graph",
+                    description: "Given a sorted dictionary of alien language words, return the correct order of characters in the alien language.",
+                        javaCode: `
     // Topological sort approach
     public String alienOrder(String[] words) {
         Map<Character, Set<Character>> adj = new HashMap<>();
@@ -3746,7 +3699,7 @@ private boolean dfs(List<List<Integer>> graph, int[] visited, int i) {
     
         return sb.length() == inDegree.size() ? sb.toString() : "";
     }`,
-      pythonCode: `
+                            pythonCode: `
     def alienOrder(words):
         from collections import defaultdict, deque
         adj = defaultdict(set)
@@ -3772,15 +3725,15 @@ private boolean dfs(List<List<Integer>> graph, int[] visited, int i) {
                     queue.append(nei)
     
         return "".join(res) if len(res) == len(in_degree) else ""`
-    },
-    
-    {
-      id: 91,
-      title: "Graph Cycle Detection",
-      difficulty: "Hard",
-      category: "Graph",
-      description: "Detect whether a directed graph contains a cycle.",
-      javaCode: `
+},
+
+{
+    id: 91,
+        title: "Graph Cycle Detection",
+            difficulty: "Hard",
+                category: "Graph",
+                    description: "Detect whether a directed graph contains a cycle.",
+                        javaCode: `
         public boolean hasCycle(int vertices, List<List<Integer>> edges) {
             int[] inDegree = new int[vertices];
             List<List<Integer>> adj = new ArrayList<>();
@@ -3809,7 +3762,7 @@ for (int i = 0; i < vertices; i++) adj.add(new ArrayList<>());
             
             return count != vertices;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def has_cycle(vertices, edges):
             from collections import defaultdict, deque
             adj = defaultdict(list)
@@ -3830,15 +3783,15 @@ for (int i = 0; i < vertices; i++) adj.add(new ArrayList<>());
                         queue.append(neighbor)
                         
             return count != vertices`
-    },
-    
-    {
-      id: 92,
-      title: "Minimum Spanning Tree",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Find the minimum spanning tree of a weighted graph using Kruskal's algorithm.",
-      javaCode: `
+},
+
+{
+    id: 92,
+        title: "Minimum Spanning Tree",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Find the minimum spanning tree of a weighted graph using Kruskal's algorithm.",
+                        javaCode: `
         public int minSpanningTree(int vertices, int[][] edges) {
             Arrays.sort(edges, Comparator.comparingInt(e -> e[2]));
             UnionFind uf = new UnionFind(vertices);
@@ -3876,7 +3829,7 @@ for (int i = 0; i < vertices; i++) adj.add(new ArrayList<>());
                 return true;
             }
         }`,
-      pythonCode: `
+                            pythonCode: `
         class UnionFind:
             def __init__(self, n):
                 self.parent = list(range(n))
@@ -3906,43 +3859,41 @@ for (int i = 0; i < vertices; i++) adj.add(new ArrayList<>());
             cost = 0
             
             for u, v, weight in edges:
-
-PR!nce, [24-04-2025 22:39]
 if uf.union(u, v):
                     cost += weight
             
             return cost`
-    },
-    
-    {
-      id: 93,
-      title: "Lowest Common Ancestor in Binary Tree",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Find the lowest common ancestor (LCA) of two nodes in a binary tree.",
-      javaCode: `
+},
+
+{
+    id: 93,
+        title: "Lowest Common Ancestor in Binary Tree",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Find the lowest common ancestor (LCA) of two nodes in a binary tree.",
+                        javaCode: `
         public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
             if (root == null  root == p || root == q) return root;
             TreeNode left = lowestCommonAncestor(root.left, p, q);
             TreeNode right = lowestCommonAncestor(root.right, p, q);
             return left == null ? right : right == null ? left : root;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def lowest_common_ancestor(root, p, q):
             if not root or root == p or root == q:
                 return root
             left = lowest_common_ancestor(root.left, p, q)
             right = lowest_common_ancestor(root.right, p, q)
             return left if not right else right if not left else root`
-    },
-    
-    {
-      id: 94,
-      title: "Longest Increasing Path in Matrix",
-      difficulty: "Hard",
-      category: "Graph",
-      description: "Find the longest increasing path in a matrix.",
-      javaCode: `
+},
+
+{
+    id: 94,
+        title: "Longest Increasing Path in Matrix",
+            difficulty: "Hard",
+                category: "Graph",
+                    description: "Find the longest increasing path in a matrix.",
+                        javaCode: `
         public int longestIncreasingPath(int[][] matrix) {
             int m = matrix.length, n = matrix[0].length;
             int[][] memo = new int[m][n];
@@ -3971,7 +3922,7 @@ if uf.union(u, v):
             memo[i][j] = maxLen;
             return maxLen;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def longest_increasing_path(matrix):
             from functools import lru_cache
             directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
@@ -3988,15 +3939,15 @@ if 0 <= nx < len(matrix) and 0 <= ny < len(matrix[0]) and matrix[nx][ny] > matri
                 return max_len
             
             return max(dfs(i, j) for i in range(len(matrix)) for j in range(len(matrix[0]))`
-    },
-    
-    {
-      id: 95,
-      title: "Tree Diameter",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Calculate the diameter of a binary tree.",
-      javaCode: `
+},
+
+{
+    id: 95,
+        title: "Tree Diameter",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Calculate the diameter of a binary tree.",
+                        javaCode: `
         public int diameterOfBinaryTree(TreeNode root) {
             int[] diameter = new int[1];
             depth(root, diameter);
@@ -4010,7 +3961,7 @@ if 0 <= nx < len(matrix) and 0 <= ny < len(matrix[0]) and matrix[nx][ny] > matri
             diameter[0] = Math.max(diameter[0], left + right);
             return Math.max(left, right) + 1;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def diameter_of_binary_tree(root):
             diameter = 0
             
@@ -4025,15 +3976,15 @@ if 0 <= nx < len(matrix) and 0 <= ny < len(matrix[0]) and matrix[nx][ny] > matri
             
             depth(root)
             return diameter`
-    },
-    
-    {
-      id: 96,
-      title: "Course Schedule",
-      difficulty: "Medium",
-      category: "Graph",
-      description: "Determine if you can finish all courses given prerequisites (Directed Acyclic Graph).",
-      javaCode: `
+},
+
+{
+    id: 96,
+        title: "Course Schedule",
+            difficulty: "Medium",
+                category: "Graph",
+                    description: "Determine if you can finish all courses given prerequisites (Directed Acyclic Graph).",
+                        javaCode: `
         public boolean canFinish(int numCourses, int[][] prerequisites) {
             Map<Integer, List<Integer>> adj = new HashMap<>();
             int[] inDegree = new int[numCourses];
@@ -4060,7 +4011,7 @@ if 0 <= nx < len(matrix) and 0 <= ny < len(matrix[0]) and matrix[nx][ny] > matri
             }
             return count == numCourses;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def can_finish(numCourses, prerequisites):
             from collections import defaultdict, deque
             adj = defaultdict(list)
@@ -4081,15 +4032,15 @@ if 0 <= nx < len(matrix) and 0 <= ny < len(matrix[0]) and matrix[nx][ny] > matri
                         queue.append(next)
             
             return count == numCourses`
-    },
-    
-    {
-      id: 97,
-      title: "Kth Smallest Element in a BST",
-      difficulty: "Medium",
-      category: "Tree",
-      description: "Find the kth smallest element in a Binary Search Tree (BST).",
-      javaCode: `
+},
+
+{
+    id: 97,
+        title: "Kth Smallest Element in a BST",
+            difficulty: "Medium",
+                category: "Tree",
+                    description: "Find the kth smallest element in a Binary Search Tree (BST).",
+                        javaCode: `
         public int kthSmallest(TreeNode root, int k) {
             Stack<TreeNode> stack = new Stack<>();
             while (true) {
@@ -4104,7 +4055,7 @@ if 0 <= nx < len(matrix) and 0 <= ny < len(matrix[0]) and matrix[nx][ny] > matri
 PR!nce, [24-04-2025 22:39]
 }
         }`,
-      pythonCode: `
+                            pythonCode: `
         def kth_smallest(root, k):
             stack = []
             while True:
@@ -4116,15 +4067,15 @@ PR!nce, [24-04-2025 22:39]
                 if k == 0:
                     return root.val
                 root = root.right`
-    },
-    
-    {
-      id: 98,
-      title: "Word Ladder",
-      difficulty: "Hard",
-      category: "Graph",
-      description: "Find the shortest transformation sequence from the start word to the end word by changing one letter at a time.",
-      javaCode: `
+},
+
+{
+    id: 98,
+        title: "Word Ladder",
+            difficulty: "Hard",
+                category: "Graph",
+                    description: "Find the shortest transformation sequence from the start word to the end word by changing one letter at a time.",
+                        javaCode: `
         public int ladderLength(String beginWord, String endWord, List<String> wordList) {
             Set<String> wordSet = new HashSet<>(wordList);
             if (!wordSet.contains(endWord)) return 0;
@@ -4154,7 +4105,7 @@ PR!nce, [24-04-2025 22:39]
             }
             return 0;
         }`,
-      pythonCode: `
+                            pythonCode: `
         def ladder_length(beginWord, endWord, wordList):
             word_set = set(wordList)
             if endWord not in word_set:
@@ -4177,15 +4128,15 @@ PR!nce, [24-04-2025 22:39]
                                 word_set.remove(next_word)
                 length += 1
             return 0`
-    },
-    
-    {
-      id: 99,
-      title: "Serialize and Deserialize Binary Tree",
-      difficulty: "Hard",
-      category: "Tree",
-      description: "Serialize and deserialize a binary tree.",
-      javaCode: `
+},
+
+{
+    id: 99,
+        title: "Serialize and Deserialize Binary Tree",
+            difficulty: "Hard",
+                category: "Tree",
+                    description: "Serialize and deserialize a binary tree.",
+                        javaCode: `
         public class Codec {
             public String serialize(TreeNode root) {
                 if (root == null) return "null,";
@@ -4206,7 +4157,7 @@ PR!nce, [24-04-2025 22:39]
                 return node;
             }
         }`,
-      pythonCode: `
+                            pythonCode: `
         class Codec:
             def serialize(self, root):
                 def dfs(node):
@@ -4235,15 +4186,15 @@ dfs(node.right)
                 
                 vals = iter(data.split(","))
                 return dfs()`
-    },
-    
-    {
-      id: 100,
-      title: "Binary Tree Maximum Path Sum",
-      difficulty: "Hard",
-      category: "Tree",
-      description: "Find the maximum path sum in a binary tree.",
-      javaCode: `
+},
+
+{
+    id: 100,
+        title: "Binary Tree Maximum Path Sum",
+            difficulty: "Hard",
+                category: "Tree",
+                    description: "Find the maximum path sum in a binary tree.",
+                        javaCode: `
         public int maxPathSum(TreeNode root) {
             int[] maxSum = new int[1];
             maxSum[0] = Integer.MIN_VALUE;
@@ -4258,7 +4209,7 @@ dfs(node.right)
             maxSum[0] = Math.max(maxSum[0], left + right + node.val);
             return node.val + Math.max(left, right);
         }`,
-      pythonCode: `
+                            pythonCode: `
         def max_path_sum(root):
             max_sum = float('-inf')
             
@@ -4273,158 +4224,155 @@ dfs(node.right)
             
             max_gain(root)
             return max_sum`
-    },    
+},    
     
   ];
 
-  const totalPages = Math.ceil(dsaQuestions.length / questionsPerPage);
-  const startIndex = (currentPage - 1) * questionsPerPage;
-  const endIndex = startIndex + questionsPerPage;
-  const currentQuestions = dsaQuestions.slice(startIndex, endIndex);
-  const toggleQuestion = (id: number) => {
+const totalPages = Math.ceil(dsaQuestions.length / questionsPerPage);
+const startIndex = (currentPage - 1) * questionsPerPage;
+const endIndex = startIndex + questionsPerPage;
+const currentQuestions = dsaQuestions.slice(startIndex, endIndex);
+const toggleQuestion = (id: number) => {
     setExpandedQuestion(expandedQuestion === id ? null : id);
-  };
+};
 
-PR!nce, [24-04-2025 22:39]
 return <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      <Header />
-      <main className="container mx-auto px-4 pt-24 pb-12">
+    <Header />
+    <main className="container mx-auto px-4 pt-24 pb-12">
         <div className="max-w-4xl mx-auto space-y-8">
-          <div className="animate-fade-in">
-            <h1 className="text-4xl font-bold mb-4">Top 100 DSA Interview Questions</h1>
-            <p className="text-gray-600 text-lg mb-8">
-              Master the most important Data Structures and Algorithms questions with detailed explanations
-              and code samples in Java and Python.
-            </p>
-            {profile && (
-              <div className="bg-blue-50 p-4 rounded-lg mb-6 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Your progress: {solvedQuestions.length} / 100 questions solved</p>
-                  <p className="text-sm text-gray-600">Current badge: {profile.badge}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {["Beginner", "Bronze", "Silver", "Gold", "Diamond"].map((badge) => (
-                    <div 
-                      key={badge}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        badge === profile.badge 
-                          ? 'ring-2 ring-blue-500 ring-offset-2' 
-                          : 'opacity-40'
-                      } ${
-                        badge === "Beginner" ? "bg-gray-200" :
-                        badge === "Bronze" ? "bg-amber-600" :
-                        badge === "Silver" ? "bg-gray-400" :
-                        badge === "Gold" ? "bg-yellow-400" :
-                        "bg-purple-400"
-                      }`}
-                      title={badge}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            {currentQuestions.map(question => (
-              <Card key={question.id} className="transform transition-all duration-300 hover:shadow-lg animate-fade-in-slow">
-                <CardHeader className="cursor-pointer" onClick={() => toggleQuestion(question.id)}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1">
-                        <Checkbox 
-                          id={`question-${question.id}`}
-                          checked={solvedQuestions.includes(question.id)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCheckboxClick(question.id);
-                          }}
-                          disabled={isLoading}
-                        />
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl">
-                          {question.id}. {question.title}
-                        </CardTitle>
-                        <div className="flex gap-2 mt-2">
-                          <span className={`text-sm px-2 py-1 rounded-full ${question.difficulty === "Easy" ? "bg-green-100 text-green-700" : question.difficulty === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
-                            {question.difficulty}
-                          </span>
-                          <span className="text-sm px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                            {question.category}
-                          </span>
+            <div className="animate-fade-in">
+                <h1 className="text-4xl font-bold mb-4">Top 100 DSA Interview Questions</h1>
+                <p className="text-gray-600 text-lg mb-8">
+                    Master the most important Data Structures and Algorithms questions with detailed explanations
+                    and code samples in Java and Python.
+                </p>
+                {profile && (
+                    <div className="bg-blue-50 p-4 rounded-lg mb-6 flex items-center justify-between">
+                        <div>
+                            <p className="font-medium">Your progress: {solvedQuestions.length} / 100 questions solved</p>
+                            <p className="text-sm text-gray-600">Current badge: {profile.badge}</p>
                         </div>
-                      </div>
+                        <div className="flex items-center gap-2">
+                            {["Beginner", "Bronze", "Silver", "Gold", "Diamond"].map((badge) => (
+                                <div
+                                    key={badge}
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center ${badge === profile.badge
+                                            ? 'ring-2 ring-blue-500 ring-offset-2'
+                                            : 'opacity-40'
+                                        } ${badge === "Beginner" ? "bg-gray-200" :
+                                            badge === "Bronze" ? "bg-amber-600" :
+                                                badge === "Silver" ? "bg-gray-400" :
+                                                    badge === "Gold" ? "bg-yellow-400" :
+                                                        "bg-purple-400"
+                                        }`}
+                                    title={badge}
+                                />
+                            ))}
+                        </div>
                     </div>
-                    {expandedQuestion === question.id ? <ChevronUp className="h-6 w-6 text-gray-500" /> : <ChevronDown className="h-6 w-6 text-gray-500" />}
-                  </div>
-                </CardHeader>
+                )}
+            </div>
 
-PR!nce, [24-04-2025 22:39]
-{expandedQuestion === question.id && <CardContent className="animate-accordion-down">
-                    <div className="space-y-4">
-                      <p className="text-gray-700">{question.description}</p>
-                      
-                      <Tabs defaultValue="java" className="w-full">
-                        <TabsList>
-                          <TabsTrigger value="java">Java</TabsTrigger>
-                          <TabsTrigger value="python">Python</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="java">
-                          <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-                            <code>{question.javaCode}</code>
-                          </pre>
-                        </TabsContent>
-                        <TabsContent value="python">
-                          <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-                            <code>{question.pythonCode}</code>
-                          </pre>
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                  </CardContent>}
-              </Card>
-            ))}
-          </div>
+            <div className="space-y-6">
+                {currentQuestions.map(question => (
+                    <Card key={question.id} className="transform transition-all duration-300 hover:shadow-lg animate-fade-in-slow">
+                        <CardHeader className="cursor-pointer" onClick={() => toggleQuestion(question.id)}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-1">
+                                        <Checkbox
+                                            id={`question-${question.id}`}
+                                            checked={solvedQuestions.includes(question.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleCheckboxClick(question.id);
+                                            }}
+                                            disabled={isLoading}
+                                        />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-xl">
+                                            {question.id}. {question.title}
+                                        </CardTitle>
+                                        <div className="flex gap-2 mt-2">
+                                            <span className={`text-sm px-2 py-1 rounded-full ${question.difficulty === "Easy" ? "bg-green-100 text-green-700" : question.difficulty === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"}`}>
+                                                {question.difficulty}
+                                            </span>
+                                            <span className="text-sm px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                                                {question.category}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {expandedQuestion === question.id ? <ChevronUp className="h-6 w-6 text-gray-500" /> : <ChevronDown className="h-6 w-6 text-gray-500" />}
+                            </div>
+                        </CardHeader>
 
-          <Pagination className="mt-8">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious href="#" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className={currentPage === 1 ? "pointer-events-none opacity-50" : ""} />
-              </PaginationItem>
-              
-              {Array.from({
-              length: totalPages
-            }, (_, i) => i + 1).map(page => <PaginationItem key={page}>
-                  <PaginationLink href="#" onClick={() => setCurrentPage(page)} isActive={currentPage === page}>
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>)}
+                        PR!nce, [24-04-2025 22:39]
+                        {expandedQuestion === question.id && <CardContent className="animate-accordion-down">
+                            <div className="space-y-4">
+                                <p className="text-gray-700">{question.description}</p>
 
-              <PaginationItem>
-                <PaginationNext href="#" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""} />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+                                <Tabs defaultValue="java" className="w-full">
+                                    <TabsList>
+                                        <TabsTrigger value="java">Java</TabsTrigger>
+                                        <TabsTrigger value="python">Python</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="java">
+                                        <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                                            <code>{question.javaCode}</code>
+                                        </pre>
+                                    </TabsContent>
+                                    <TabsContent value="python">
+                                        <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+                                            <code>{question.pythonCode}</code>
+                                        </pre>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                        </CardContent>}
+                    </Card>
+                ))}
+            </div>
+
+            <Pagination className="mt-8">
+                <PaginationContent>
+                    <PaginationItem>
+                        <PaginationPrevious href="#" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className={currentPage === 1 ? "pointer-events-none opacity-50" : ""} />
+                    </PaginationItem>
+
+                    {Array.from({
+                        length: totalPages
+                    }, (_, i) => i + 1).map(page => <PaginationItem key={page}>
+                        <PaginationLink href="#" onClick={() => setCurrentPage(page)} isActive={currentPage === page}>
+                            {page}
+                        </PaginationLink>
+                    </PaginationItem>)}
+
+                    <PaginationItem>
+                        <PaginationNext href="#" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""} />
+                    </PaginationItem>
+                </PaginationContent>
+            </Pagination>
         </div>
-      </main>
-      <Footer />
+    </main>
+    <Footer />
 
-      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Question Solved</AlertDialogTitle>
-            <AlertDialogDescription>
-              Khao Ma Kasam! You have Solved this on your Code Editor.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelSolved}>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSolved}>Yes</AlertDialogAction>
-          </AlertDialogFooter>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Question Solved</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Khao Ma Kasam! You have Solved this on your Code Editor.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleCancelSolved}>No</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmSolved}>Yes</AlertDialogAction>
+            </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
-    </div>;
+    </AlertDialog>
+</div>;
 };
 
 export default DSAQuestions;
