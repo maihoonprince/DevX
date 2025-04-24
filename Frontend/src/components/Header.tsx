@@ -34,17 +34,17 @@ export const Header = () => {
               Home
             </Link>
             <Link to="/playground" className="text-sm font-medium hover:text-primary transition-colors">
-              Playground
+              PlayGround
             </Link>
             <Link to="/community" className="text-sm font-medium hover:text-primary transition-colors">
-              Community
+              DevZone
             </Link>
-            <Link to="/dsa-theory" className="text-sm font-medium hover:text-primary transition-colors">
+            {/* <Link to="/dsa-theory" className="text-sm font-medium hover:text-primary transition-colors">
               DSA Theory
             </Link>
             <Link to="/dsa-questions" className="text-sm font-medium hover:text-primary transition-colors">
               DSA
-            </Link>
+            </Link> */}
             <Link to="/developers" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1">
               Dev<Infinity className="h-4 w-4" />
             </Link>
