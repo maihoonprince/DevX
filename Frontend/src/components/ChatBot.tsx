@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, Bot, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { GiYinYang } from "react-icons/gi";
 
 interface Message {
   role: "user" | "assistant";
@@ -59,8 +60,9 @@ const ChatBot = () => {
         <Card className="w-[350px] h-[500px] flex flex-col shadow-xl">
           <div className="p-4 border-b flex justify-between items-center bg-primary text-primary-foreground">
             <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              <h3 className="font-semibold">AI Assistant</h3>
+              {/* <Bot className="h-5 w-5" /> */}
+              <GiYinYang className="h-5 w-5" />
+              <h3 className="font-semibold">OrBi</h3>
             </div>
             <Button
               variant="ghost"
