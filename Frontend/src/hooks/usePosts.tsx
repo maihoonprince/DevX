@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ export function usePosts() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -98,7 +98,7 @@ export function usePosts() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, toast]);
 
   const handleLikeToggle = async (postId: string, isLiked: boolean) => {
     if (!user) {
@@ -155,10 +155,6 @@ export function usePosts() {
           return post;
         })
       );
-
-      // Immediately fetch posts to ensure we have the latest data
-      // This is important to ensure other users see the updated like count
-      fetchPosts();
     } catch (error: any) {
       console.error("Error toggling like:", error);
       
@@ -172,9 +168,9 @@ export function usePosts() {
     }
   };
 
-  // Set up real-time listeners for updates to posts and post likes
+  // Set up real-time listeners for updates to posts, post likes, and post comments
   useEffect(() => {
-    console.log("Setting up real-time listeners for posts and likes...");
+    console.log("Setting up real-time listeners for posts and interactions...");
     
     const postsChannel = supabase
       .channel('posts-changes')
@@ -202,6 +198,18 @@ export function usePosts() {
           fetchPosts(); // Refetch when likes change
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_comments'
+        },
+        (payload) => {
+          console.log('Comment change received:', payload);
+          fetchPosts(); // Refetch when comments change
+        }
+      )
       .subscribe((status) => {
         console.log('Realtime subscription status:', status);
         if (status !== 'SUBSCRIBED') {
@@ -213,12 +221,12 @@ export function usePosts() {
       console.log("Cleaning up realtime subscription");
       supabase.removeChannel(postsChannel);
     };
-  }, [user?.id]);
+  }, [fetchPosts]);
 
   // Fetch posts when mounted and when user changes
   useEffect(() => {
     fetchPosts();
-  }, [user?.id]);
+  }, [user?.id, fetchPosts]);
 
   return {
     posts,

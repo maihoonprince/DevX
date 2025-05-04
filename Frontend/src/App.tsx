@@ -17,23 +17,26 @@ import ChatBot from "./components/ChatBot";
 import Community from "./pages/Community";
 import CommunityFeed from "./pages/community/CommunityFeed";
 import CommunityJobs from "./pages/community/CommunityJobs";
+import CommunityExplore from "./pages/community/CommunityExplore";
 import Developers from "./pages/Developers";
 import DSATheory from "./pages/DSATheory";
 import Compiler from "./pages/Compiler";
+import PythonIDE from "./pages/PythonIDE";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import Profile from "./pages/Profile";
+import UserProfile from "./pages/UserProfile";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+  <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
         <AuthProvider>
           <Routes>
             {/* Public routes */}
@@ -45,6 +48,7 @@ const App = () => (
             <Route path="/learn/nodejs" element={<NodeLearn />} />
             <Route path="/developers" element={<Developers />} />
             <Route path="/dsa-theory" element={<DSATheory/>}/>
+            <Route path="/user/:userId" element={<UserProfile />} />
             
             {/* Auth routes */}
             <Route path="/auth/login" element={<Login />} />
@@ -59,6 +63,11 @@ const App = () => (
             <Route path="/compiler" element={
               <ProtectedRoute>
                 <Compiler />
+              </ProtectedRoute>
+            } />
+            <Route path="/python-ide" element={
+              <ProtectedRoute>
+                <PythonIDE />
               </ProtectedRoute>
             } />
             <Route path="/dsa-questions" element={
@@ -83,6 +92,11 @@ const App = () => (
                 <CommunityJobs />
               </ProtectedRoute>
             } />
+            <Route path="/community/explore" element={
+              <ProtectedRoute>
+                <CommunityExplore />
+              </ProtectedRoute>
+            } />
             
             <Route path="/profile" element={
               <ProtectedRoute>
@@ -95,9 +109,9 @@ const App = () => (
           </Routes>
           <ChatBot />
         </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );
 
 export default App;

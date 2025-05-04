@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Link, Pencil } from "lucide-react";
+import { Link, Pencil, Award, Star } from "lucide-react";
 
 interface ProfileHeaderProps {
   profile: {
@@ -32,6 +32,36 @@ export function ProfileHeader({ profile, onEdit }: ProfileHeaderProps) {
   const positionDisplay = profile.position === "Student" 
     ? `Student at ${profile.organization || ""}` 
     : `${profile.position || ""} at ${profile.organization || ""}`;
+
+  const getBadgeStyles = (badge: string | null) => {
+    switch (badge) {
+      case "Diamond":
+        return "bg-gradient-to-r from-blue-400 to-purple-500 text-white";
+      case "Gold":
+        return "bg-gradient-to-r from-yellow-300 to-amber-500 text-black";
+      case "Silver":
+        return "bg-gradient-to-r from-gray-300 to-gray-400 text-black";
+      case "Bronze":
+        return "bg-gradient-to-r from-amber-700 to-amber-600 text-white";
+      default:
+        return "bg-gradient-to-r from-green-200 to-green-300 text-black";
+    }
+  };
+
+  const getBadgeIcon = (badge: string | null) => {
+    switch (badge) {
+      case "Diamond":
+        return <Award className="w-3 h-3 mr-1" />;
+      case "Gold":
+        return <Star className="w-3 h-3 mr-1 fill-current" />;
+      case "Silver":
+        return <Star className="w-3 h-3 mr-1" />;
+      case "Bronze":
+        return <Star className="w-3 h-3 mr-1" />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex flex-col items-center md:flex-row md:items-start md:gap-8">
@@ -62,7 +92,12 @@ export function ProfileHeader({ profile, onEdit }: ProfileHeaderProps) {
           </Button>
         </div>
         
-        <Badge className="mt-2 mb-4">{profile.badge || "Beginner"}</Badge>
+        <div className="mt-2 mb-4">
+          <div className={`inline-flex items-center px-3 py-1 rounded-full shadow-sm transition-transform hover:scale-105 ${getBadgeStyles(profile.badge)}`}>
+            {getBadgeIcon(profile.badge)}
+            <span className="font-semibold">{profile.badge || "Beginner"}</span>
+          </div>
+        </div>
         
         <h2 className="font-medium mb-3">{positionDisplay}</h2>
         

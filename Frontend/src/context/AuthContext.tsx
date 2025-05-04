@@ -29,6 +29,7 @@ type AuthContextType = {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   getProfile: () => Promise<Profile | null>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -172,6 +173,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshProfile = async (): Promise<void> => {
+    try {
+      if (!user) {
+        console.log("No user found in refreshProfile");
+        return;
+      }
+      
+      const updatedProfile = await getProfile();
+      setProfile(updatedProfile);
+    } catch (error) {
+      console.error('Error in refreshProfile function:', error);
+    }
+  };
+
   const signUp = async (
     email: string, 
     password: string, 
@@ -297,8 +312,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Refresh profile data
-      const updatedProfile = await getProfile();
-      setProfile(updatedProfile);
+      await refreshProfile();
 
       toast({
         title: "Profile updated",
@@ -320,6 +334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signOut,
     updateProfile,
     getProfile,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

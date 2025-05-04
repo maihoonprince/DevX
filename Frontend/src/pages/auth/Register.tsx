@@ -12,6 +12,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const registerSchema = z.object({
   fullName: z.string().min(2, { message: 'Full name must be at least 2 characters' }),
@@ -34,6 +42,8 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -129,7 +139,10 @@ const Register = () => {
         profile_image: null, // We'll update this after upload
       });
 
-      // Navigate to login page is handled in the signUp function
+      // Show confirmation dialog instead of navigating to login page
+      setRegisteredEmail(values.email);
+      setIsConfirmDialogOpen(true);
+      
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -139,6 +152,11 @@ const Register = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleConfirmationClose = () => {
+    setIsConfirmDialogOpen(false);
+    navigate('/auth/login');
   };
 
   return (
@@ -302,6 +320,29 @@ const Register = () => {
           </p>
         </CardFooter>
       </Card>
+
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Email Verification Required</DialogTitle>
+            <DialogDescription>
+              We've sent a verification email to <strong>{registeredEmail}</strong>. 
+              Please check your inbox and click the verification link to activate your account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-3 mt-4">
+            <p className="text-sm">
+              If you don't see the email in your inbox, please check your spam folder.
+              After verifying your email, you can come back and login to your account.
+            </p>
+          </div>
+          <DialogFooter className="sm:justify-center mt-6">
+            <Button type="button" onClick={handleConfirmationClose}>
+              Go to Login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

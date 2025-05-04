@@ -123,16 +123,17 @@ const Playground = () => {
               />
               <PlaygroundCard
                 title="MERN Stack"
-                description="Practice command line operations in a safe environment with our built-in terminal simulator. Perfect for learning DevOps basics."
+                description="Learn MERN Stack from basics to advanced with detailed explanations, examples, and visualizations."
                 icon={Terminal}
                 delay={0.3}
                 to="/learn"
               />
               <PlaygroundCard
-                title="Project Workspace"
-                description="Build and experiment with full-stack projects in an isolated environment. Perfect for testing new ideas and learning frameworks."
+                title="Python IDE"
+                description="Write, run, and debug Python code directly in your browser with our powerful Python online compiler."
                 icon={Laptop}
                 delay={0.4}
+                to="/python-ide"
               />
             </TabsContent>
 

@@ -161,13 +161,7 @@ const Profile = () => {
         <Card className="w-full max-w-4xl mx-auto overflow-hidden">
           <CardContent className="p-8">
             {isEditing ? (
-              <ProfileForm 
-                defaultValues={defaultValues}
-                onSubmit={onSubmit}
-                onCancel={() => setIsEditing(false)}
-                isLoading={isLoading}
-                handleImageChange={handleImageChange}
-              />
+              <ProfileForm />
             ) : (
               <>
                 <ProfileHeader 

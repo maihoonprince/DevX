@@ -34,12 +34,12 @@ export const Hero = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="space-y-4 animate-fade-in">
             <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-              Learn to Code with
+              An  
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
                 {" "}
-                AI-Powered
+                Integrated Platform
               </span>{" "}
-              Support
+              for Developers
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto animate-fade-in-slow">
               Master web development, algorithms, and coding practices with our comprehensive 

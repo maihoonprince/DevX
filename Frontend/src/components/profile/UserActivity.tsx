@@ -1,10 +1,23 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarDays, MessageSquare, Star, Link } from "lucide-react";
+import { CalendarDays, MessageSquare, Star, Link, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // These types would ideally come from your data models
 type Post = {
@@ -16,6 +29,7 @@ type Post = {
   comments_count: number;
   has_image?: boolean;
   image_url?: string | null;
+  user_id: string;
 };
 
 type Job = {
@@ -28,6 +42,7 @@ type Job = {
   type?: string;
   job_type?: string;
   experience?: string;
+  user_id: string;
 };
 
 interface UserActivityProps {
@@ -38,7 +53,12 @@ export function UserActivity({ userId }: UserActivityProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<{id: string, type: 'post' | 'job'} | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  const isCurrentUser = user?.id === userId;
 
   useEffect(() => {
     fetchUserActivity();
@@ -91,6 +111,61 @@ export function UserActivity({ userId }: UserActivityProps) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    try {
+      let error;
+      if (deleteTarget.type === 'post') {
+        const { error: deleteError } = await supabase
+          .from('community_posts')
+          .delete()
+          .eq('id', deleteTarget.id)
+          .eq('user_id', user?.id); // Ensure user can only delete their own posts
+        
+        error = deleteError;
+        if (!deleteError) {
+          setPosts(prev => prev.filter(post => post.id !== deleteTarget.id));
+        }
+      } else {
+        const { error: deleteError } = await supabase
+          .from('jobs')
+          .delete()
+          .eq('id', deleteTarget.id)
+          .eq('user_id', user?.id); // Ensure user can only delete their own jobs
+        
+        error = deleteError;
+        if (!deleteError) {
+          setJobs(prev => prev.filter(job => job.id !== deleteTarget.id));
+        }
+      }
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: `${deleteTarget.type === 'post' ? 'Post' : 'Job'} deleted`,
+        description: `The ${deleteTarget.type} has been successfully deleted.`
+      });
+    } catch (error: any) {
+      console.error(`Error deleting ${deleteTarget.type}:`, error);
+      toast({
+        title: `Failed to delete ${deleteTarget.type}`,
+        description: error.message || `An error occurred while deleting the ${deleteTarget.type}.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  const confirmDelete = (id: string, type: 'post' | 'job') => {
+    setDeleteTarget({ id, type });
+  };
+
   if (isLoading) {
     return (
       <div className="mt-6 space-y-4">
@@ -125,7 +200,21 @@ export function UserActivity({ userId }: UserActivityProps) {
             posts.map(post => (
               <Card key={post.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
-                  <h3 className="text-xl font-medium mb-2">{post.title}</h3>
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-xl font-medium mb-2">{post.title}</h3>
+                    {isCurrentUser && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => confirmDelete(post.id, 'post')} 
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="sr-only">Delete Post</span>
+                      </Button>
+                    )}
+                  </div>
+                  
                   <p className="text-muted-foreground mb-3 line-clamp-2">{post.content}</p>
                   
                   {post.has_image && post.image_url && (
@@ -169,7 +258,20 @@ export function UserActivity({ userId }: UserActivityProps) {
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-xl font-medium">{job.title}</h3>
-                    <Badge>{job.job_type || job.type}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge>{job.job_type || job.type}</Badge>
+                      {isCurrentUser && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => confirmDelete(job.id, 'job')} 
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="sr-only">Delete Job</span>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   <h4 className="text-primary font-medium mb-3">{job.company} • {job.location}</h4>
@@ -187,6 +289,28 @@ export function UserActivity({ userId }: UserActivityProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this {deleteTarget?.type}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your {deleteTarget?.type} 
+              and remove it from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={isDeleting} 
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
