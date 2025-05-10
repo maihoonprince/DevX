@@ -1,10 +1,13 @@
+
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, Infinity } from "lucide-react";
+import { Menu, Infinity, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MessagePanel } from "@/components/messages/MessagePanel";
+
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -39,29 +42,40 @@ export const Header = () => {
 
           {/* User Profile or Login Button (Desktop) */}
           <div className="hidden md:flex items-center space-x-4">
-            {user && profile ? <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="rounded-full p-0 h-10 w-10">
-                    <Avatar>
-                      <AvatarImage src={profile.profile_image || ""} alt={profile.full_name} />
-                      <AvatarFallback>
-                        {profile.full_name.split(' ').map(name => name[0]).join('').toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()}>
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu> : <Button onClick={() => navigate('/auth/login')} variant="default">
+            {user && profile ? (
+              <>
+                {user && (
+                <Link to="/community/messages" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+                  <MessageSquare className="h-4 w-4" />
+                </Link>
+              )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="rounded-full p-0 h-10 w-10">
+                      <Avatar>
+                        <AvatarImage src={profile.profile_image || ""} alt={profile.full_name} />
+                        <AvatarFallback>
+                          {profile.full_name.split(' ').map(name => name[0]).join('').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => signOut()}>
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <Button onClick={() => navigate('/auth/login')} variant="default">
                 Register / Login
-              </Button>}
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -85,6 +99,14 @@ export const Header = () => {
               <Link to="/developers" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1" onClick={() => setIsMenuOpen(false)}>
                 Dev<Infinity className="h-4 w-4" />
               </Link>
+              
+              {/* Message link for mobile */}
+              {user && (
+                <Link to="/community/messages" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+                  <MessageSquare className="h-4 w-4" />
+                  Messages
+                </Link>
+              )}
               
               {/* User Profile or Login Button (Mobile) */}
               {user && profile ? <>

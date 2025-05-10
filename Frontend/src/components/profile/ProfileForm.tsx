@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { ProfileImageUploader } from "./ProfileImageUploader";
+import { uploadProfileImage } from "@/services/imageUploadService";
 
 const profileFormSchema = z.object({
   full_name: z.string().min(2, {
@@ -93,24 +94,12 @@ export function ProfileForm() {
       let profileImagePath = profile?.profile_image || null;
       
       if (profileImage) {
-        const fileExt = profileImage.name.split('.').pop();
-        const fileName = `${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `profile-images/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('user-content')
-          .upload(filePath, profileImage);
-          
-        if (uploadError) {
-          throw uploadError;
+        const uploadedUrl = await uploadProfileImage(profileImage, user.id);
+        if (uploadedUrl) {
+          profileImagePath = uploadedUrl;
+        } else {
+          throw new Error("Failed to upload profile image");
         }
-        
-        // Get the public URL
-        const { data: publicUrlData } = supabase.storage
-          .from('user-content')
-          .getPublicUrl(filePath);
-          
-        profileImagePath = publicUrlData.publicUrl;
       }
       
       // Update profile in database

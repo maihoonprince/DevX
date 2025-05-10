@@ -18,6 +18,7 @@ import Community from "./pages/Community";
 import CommunityFeed from "./pages/community/CommunityFeed";
 import CommunityJobs from "./pages/community/CommunityJobs";
 import CommunityExplore from "./pages/community/CommunityExplore";
+import Messages from "./pages/community/Messages";
 import Developers from "./pages/Developers";
 import DSATheory from "./pages/DSATheory";
 import Compiler from "./pages/Compiler";
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/developers" element={<Developers />} />
             <Route path="/dsa-theory" element={<DSATheory/>}/>
             <Route path="/user/:userId" element={<UserProfile />} />
+            {/* <Route path="/OrBi" element={<ChatBot/>}/> */}
             
             {/* Auth routes */}
             <Route path="/auth/login" element={<Login />} />
@@ -95,6 +97,16 @@ const App = () => (
             <Route path="/community/explore" element={
               <ProtectedRoute>
                 <CommunityExplore />
+              </ProtectedRoute>
+            } />
+            <Route path="/community/messages" element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            } />
+            <Route path="/community/messages/:conversationId" element={
+              <ProtectedRoute>
+                <Messages />
               </ProtectedRoute>
             } />
             

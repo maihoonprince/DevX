@@ -8,6 +8,7 @@ import { MessageSquare, Users, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationsPanel } from "./NotificationsPanel";
+import { MessagePanel } from "@/components/messages/MessagePanel";
 
 interface CommunityLayoutProps {
   children: ReactNode;
@@ -78,6 +79,7 @@ export function CommunityLayout({ children }: CommunityLayoutProps) {
             </div>
             
             <div className="flex items-center gap-3">
+              <MessagePanel />
               <NotificationsPanel />
               
               <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">

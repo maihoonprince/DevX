@@ -5,8 +5,9 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import { Code, Play, Undo } from "lucide-react";
+import { Code, Play, Undo, Download, Copy } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 const Compiler = () => {
   const [html, setHtml] = useState('<div class="container">\n  <h1>Hello, World!</h1>\n  <p>Start editing to see some magic happen!</p>\n</div>');
@@ -42,6 +43,7 @@ const Compiler = () => {
     setHtml('<div class="container">\n  <h1>Hello, World!</h1>\n  <p>Start editing to see some magic happen!</p>\n</div>');
     setCss('.container {\n  font-family: sans-serif;\n  max-width: 800px;\n  margin: 0 auto;\n  padding: 20px;\n  text-align: center;\n}\n\nh1 {\n  color: #4f46e5;\n}\n\np {\n  color: #666;\n}');
     setJs('// JavaScript goes here\nconsole.log("Hello from JavaScript!");\n\n// Get the heading element\nconst heading = document.querySelector("h1");\n\n// Add a click event listener\nheading.addEventListener("click", () => {\n  heading.style.color = "#" + Math.floor(Math.random()*16777215).toString(16);\n});');
+    toast.success("Code reset to default");
   };
 
   // Run the code
@@ -61,6 +63,50 @@ const Compiler = () => {
       </html>
     `;
     setOutput(combinedOutput);
+    toast.success("Code executed successfully");
+  };
+
+  const copyToClipboard = () => {
+    const activeLang = document.querySelector('[aria-selected="true"]')?.getAttribute('value') || 'html';
+    let contentToCopy = '';
+    
+    if (activeLang === 'html') {
+      contentToCopy = html;
+    } else if (activeLang === 'css') {
+      contentToCopy = css;
+    } else if (activeLang === 'js') {
+      contentToCopy = js;
+    }
+    
+    navigator.clipboard.writeText(contentToCopy);
+    toast.success(`${activeLang.toUpperCase()} code copied to clipboard`);
+  };
+
+  const downloadCode = () => {
+    const activeLang = document.querySelector('[aria-selected="true"]')?.getAttribute('value') || 'html';
+    let contentToDownload = '';
+    let filename = '';
+    
+    if (activeLang === 'html') {
+      contentToDownload = html;
+      filename = 'index.html';
+    } else if (activeLang === 'css') {
+      contentToDownload = css;
+      filename = 'styles.css';
+    } else if (activeLang === 'js') {
+      contentToDownload = js;
+      filename = 'script.js';
+    }
+    
+    const element = document.createElement("a");
+    const file = new Blob([contentToDownload], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    
+    toast.success(`${filename} downloaded successfully`);
   };
 
   return (
@@ -142,6 +188,24 @@ const Compiler = () => {
                       Reset
                     </Button>
                     <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={copyToClipboard}
+                      className="flex items-center gap-1"
+                    >
+                      <Copy size={14} />
+                      Copy
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={downloadCode}
+                      className="flex items-center gap-1"
+                    >
+                      <Download size={14} />
+                      Download
+                    </Button>
+                    <Button 
                       size="sm" 
                       onClick={handleRun}
                       className="flex items-center gap-1"
@@ -170,6 +234,7 @@ const Compiler = () => {
                 <li>Try clicking on the heading in the preview to see the JavaScript in action.</li>
                 <li>Click "Reset" to restore the default starter code.</li>
                 <li>The editor supports standard HTML5, CSS3, and modern JavaScript features.</li>
+                <li>Use the Copy button to copy your code to clipboard and Download to save it locally.</li>
               </ul>
             </div>
           </div>

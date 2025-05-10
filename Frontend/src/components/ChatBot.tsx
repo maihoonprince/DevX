@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Bot, X } from "lucide-react";
+import { Loader2, Bot, X, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { GiYinYang } from "react-icons/gi";
+import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,7 +21,17 @@ const ChatBot = () => {
   const [input, setInput] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -27,6 +40,12 @@ const ChatBot = () => {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
+
+    // Check for direct messaging commands
+    if (userMessage.toLowerCase().startsWith("/message") || userMessage.toLowerCase().startsWith("/dm")) {
+      handleDirectMessageCommand(userMessage);
+      return;
+    }
 
     try {
       const response = await fetch("https://devx-backend.onrender.com/api/chat", {
@@ -54,16 +73,62 @@ const ChatBot = () => {
     }
   };
 
+  const handleDirectMessageCommand = async (message: string) => {
+    // Show "Features Coming Soon" toast for direct messaging
+    toast({
+      title: "Features Coming Soon",
+      description: "Direct messaging is coming soon! Stay tuned for updates.",
+      variant: "default",
+    });
+    
+    // Still display a helpful message in the chat
+    setMessages((prev) => [...prev, { 
+      role: "assistant", 
+      content: "The direct messaging feature is coming soon! In the meantime, you can continue chatting with me or explore other parts of the application." 
+    }]);
+    
+    setIsLoading(false);
+  };
+
+  // Handle clicks on the "Open Conversation" button
+  useEffect(() => {
+    const handleOpenConversation = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('open-conversation-btn')) {
+        const conversationId = target.getAttribute('data-conversation-id');
+        if (conversationId) {
+          setIsOpen(false);
+          navigate(`/community/messages/${conversationId}`);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleOpenConversation);
+    return () => {
+      document.removeEventListener('click', handleOpenConversation);
+    };
+  }, [navigate]);
+
+  // Display helpful hint about direct messaging feature when chat is opened
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([{ 
+        role: "assistant", 
+        content: "Welcome to OrBi! You can ask me anything, or use /message username to start a direct conversation with another user (coming soon)." 
+      }]);
+    }
+  }, [isOpen, messages.length]);
+
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {isOpen ? (
         <Card className="w-[350px] h-[500px] flex flex-col shadow-xl">
-          <div className="p-4 border-b flex justify-between items-center bg-primary text-primary-foreground">
+          <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-cyan-400 to-blue-500">
             <div className="flex items-center gap-2">
-              {/* <Bot className="h-5 w-5" /> */}
               <GiYinYang className="h-5 w-5" />
-              <h3 className="font-semibold">OrBi</h3>
+              <h3 className="font-semibold"> OrBi </h3>
             </div>
+
             <Button
               variant="ghost"
               size="icon"
@@ -88,7 +153,12 @@ const ChatBot = () => {
                   }`}
                 >
                   {message.role === "assistant" ? (
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <ReactMarkdown components={{
+                      // This allows the custom button to render correctly
+                      button: ({node, ...props}) => <button className="bg-blue-500 text-white px-3 py-1 rounded-md flex items-center gap-1 text-sm hover:bg-blue-600 transition-colors" {...props}><MessageCircle className="h-3 w-3" /> {props.children}</button>
+                    }}>
+                      {message.content}
+                    </ReactMarkdown>
                   ) : (
                     message.content
                   )}
@@ -102,11 +172,17 @@ const ChatBot = () => {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <form onSubmit={handleSubmit} className="p-4 border-t">
             <div className="flex gap-2">
-              <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask a question..." disabled={isLoading} />
+              <Input 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+                placeholder={user ? "Ask a question or use /message username..." : "Ask a question..."} 
+                disabled={isLoading} 
+              />
               <Button type="submit" disabled={isLoading}>
                 Send
               </Button>
