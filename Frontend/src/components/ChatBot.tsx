@@ -114,7 +114,7 @@ const ChatBot = () => {
     if (isOpen && messages.length === 0) {
       setMessages([{ 
         role: "assistant", 
-        content: "Welcome to OrBi! You can ask me anything, or use /message username to start a direct conversation with another user (coming soon)." 
+        content: "Welcome to OrBi!" 
       }]);
     }
   }, [isOpen, messages.length]);
